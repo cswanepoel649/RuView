@@ -1,0 +1,20 @@
+{
+  "name": "@ruview/gateway-agent",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "ruview-agent: home gateway bridge between RuView sensing (ESP32 UDP + sensing-server) and the cloud platform",
+  "bin": { "ruview-agent": "dist/ruview-agent.mjs" },
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/ruview-agent.mjs --banner:js=\"#!/usr/bin/env node\"",
+    "start": "node dist/ruview-agent.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ruview/shared": "1.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

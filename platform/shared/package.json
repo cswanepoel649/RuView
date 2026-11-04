@@ -1,0 +1,21 @@
+{
+  "name": "@ruview/shared",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Wire protocol schemas, ESP32 packet codecs and NVS partition generator shared by web and gateway agent",
+  "exports": {
+    ".": "./src/index.ts",
+    "./protocol": "./src/protocol.ts",
+    "./nvs": "./src/nvs/index.ts",
+    "./esp32": "./src/esp32/index.ts",
+    "./catalog": "./src/catalog.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "4.6.7"
+  }
+}

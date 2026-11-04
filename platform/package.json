@@ -1,0 +1,20 @@
+{
+  "name": "ruview-platform",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Multi-tenant home monitoring platform built on RuView (ESP32 CSI sensing)",
+  "workspaces": ["shared", "gateway-agent", "web"],
+  "engines": { "node": ">=20.11" },
+  "scripts": {
+    "test": "npm run test -w @ruview/shared && npm run test -w @ruview/gateway-agent && npm run test -w @ruview/web",
+    "test:db": "bash supabase/tests/run-local.sh",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint -w @ruview/web",
+    "build": "npm run build -w @ruview/gateway-agent && npm run build -w @ruview/web"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  }
+}
