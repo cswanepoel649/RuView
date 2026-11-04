@@ -1,0 +1,41 @@
+# RuView home gateway: unmodified RuView sensing-server + ruview-agent bridge.
+# Installed to /opt/ruview by install/gateway.sh. Both use host networking:
+#   - ESP32 nodes send UDP to <gateway-ip>:5005 (agent tap) → relayed to 127.0.0.1:5006
+#   - sensing-server HTTP/WS bound to 127.0.0.1 only; agent connects outbound to the cloud
+name: ruview
+services:
+  sensing-server:
+    image: ${SENSING_IMAGE:-ruvnet/wifi-densepose:latest}   # pin by digest in production
+    network_mode: host
+    restart: unless-stopped
+    command: ["/app/sensing-server", "--source", "esp32", "--udp-port", "5006",
+              "--http-port", "8080", "--ws-port", "8765", "--bind-addr", "127.0.0.1",
+              "--ui-path", "/app/ui", "--tick-ms", "100"]
+    environment:
+      RUST_LOG: info
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+
+  ruview-agent:
+    image: node:22-bookworm-slim
+    network_mode: host
+    restart: unless-stopped
+    depends_on: [sensing-server]
+    user: "1000:1000"
+    command: ["node", "/opt/ruview/ruview-agent.mjs"]
+    env_file: ./agent.env
+    environment:
+      RUVIEW_STATE_DIR: /var/lib/ruview-agent
+      RUVIEW_UDP_LISTEN: 0.0.0.0:5005
+      RUVIEW_UDP_FORWARD: 127.0.0.1:5006
+      RUVIEW_SENSING_WS: ws://127.0.0.1:8765/ws/sensing
+      RUVIEW_SENSING_HTTP: http://127.0.0.1:8080
+    volumes:
+      - ./ruview-agent.mjs:/opt/ruview/ruview-agent.mjs:ro
+      - ./state:/var/lib/ruview-agent
+      - /etc/machine-id:/etc/machine-id:ro
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "5" } }

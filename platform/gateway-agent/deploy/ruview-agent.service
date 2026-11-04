@@ -1,0 +1,24 @@
+# Alternative to Docker: run the agent under systemd (sensing-server installed separately,
+# started with: sensing-server --source esp32 --udp-port 5006 --bind-addr 127.0.0.1).
+[Unit]
+Description=RuView gateway agent (ESP32 UDP tap + cloud bridge)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+EnvironmentFile=/etc/ruview/agent.env
+Environment=RUVIEW_STATE_DIR=/var/lib/ruview-agent
+ExecStart=/usr/bin/node /opt/ruview/ruview-agent.mjs
+Restart=always
+RestartSec=5
+DynamicUser=yes
+StateDirectory=ruview-agent
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

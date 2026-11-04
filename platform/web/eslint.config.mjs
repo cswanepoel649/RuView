@@ -1,13 +1,15 @@
 import next from 'eslint-config-next';
 import nextTs from 'eslint-config-next/typescript';
 
-export default [
+const config = [
   ...next,
   ...nextTs,
-  { ignores: ['.next/**', 'node_modules/**', 'next-env.d.ts'] },
+  { ignores: ['.next/**', 'node_modules/**', 'next-env.d.ts', 'public/install/**'] },
   {
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
 ];
+
+export default config;

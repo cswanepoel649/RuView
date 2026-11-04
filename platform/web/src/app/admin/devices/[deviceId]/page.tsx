@@ -7,7 +7,7 @@ import { EnrollmentCode } from '@/components/admin/EnrollmentCode';
 import { requireStaff } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { serverEnv } from '@/lib/env';
-import { bytes, formatDateTime, MOTION_LABEL, STATUS_LABEL, timeAgo } from '@/lib/format';
+import { bytes, formatDateTime, isoNow, MOTION_LABEL, STATUS_LABEL, timeAgo } from '@/lib/format';
 import { FIRMWARE_OTA_MAX_BYTES, CAPABILITY_LABEL } from '@ruview/shared/catalog';
 import type { Device, DeviceModel, DeviceStatus, FirmwareRelease, NodeState, Room } from '@/lib/types';
 import {
@@ -32,7 +32,7 @@ export default async function DeviceDetail({ params }: { params: Promise<{ devic
     db.from('node_state').select('*').eq('device_id', deviceId).maybeSingle(),
     d.kind === 'sensor_node' ? db.from('firmware_releases').select('*').eq('status', 'published').contains('model_ids', [d.model_id]).order('created_at', { ascending: false }) : Promise.resolve({ data: [] }),
     d.kind === 'gateway' ? db.from('device_credentials').select('id, token_prefix, created_at, last_used_at, revoked_at').eq('device_id', deviceId).order('created_at', { ascending: false }) : Promise.resolve({ data: [] }),
-    d.kind === 'gateway' ? db.from('gateway_enrollments').select('id, expires_at, used_at, created_at').eq('device_id', deviceId).order('created_at', { ascending: false }).limit(5) : Promise.resolve({ data: [] }),
+    d.kind === 'gateway' ? db.from('gateway_enrollments').select('id, expires_at, used_at, created_at').eq('device_id', deviceId).is('used_at', null).gt('expires_at', isoNow()).limit(5) : Promise.resolve({ data: [] }),
     d.kind === 'gateway' ? db.from('devices').select('id, name, node_id, status, last_seen_at, last_rssi, room_id').eq('gateway_id', deviceId).order('node_id') : Promise.resolve({ data: [] }),
     d.gateway_id ? db.from('devices').select('id, name, status').eq('id', d.gateway_id).single() : Promise.resolve({ data: null }),
   ]);
@@ -145,7 +145,7 @@ export default async function DeviceDetail({ params }: { params: Promise<{ devic
                       <span className="text-muted">{c.revoked_at ? `revoked ${timeAgo(c.revoked_at as string)}` : `active · used ${timeAgo(c.last_used_at as string | null)}`}</span></p>
                   ))}
                   {((creds.data ?? []) as H[]).length === 0 && <p className="text-xs text-muted">Not enrolled yet.</p>}
-                  {((enrollments.data ?? []) as H[]).filter((e) => !e.used_at && Date.parse(e.expires_at as string) > Date.now()).length > 0 && <p className="mt-1 text-xs text-info">An unused enrollment code is pending.</p>}
+                  {((enrollments.data ?? []) as H[]).length > 0 && <p className="mt-1 text-xs text-info">An unused enrollment code is pending.</p>}
                 </div>
                 {((creds.data ?? []) as H[]).some((c) => !c.revoked_at) && (
                   <form action={revokeGatewayTokensAction}><input type="hidden" name="id" value={d.id} /><ConfirmSubmit message="Revoke this gateway's token? It will stop reporting until re-enrolled.">Revoke token</ConfirmSubmit></form>

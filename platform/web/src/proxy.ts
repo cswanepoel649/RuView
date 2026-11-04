@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
-const PUBLIC_PREFIXES = ['/login', '/auth', '/forgot-password', '/api/gateway', '/api/cron', '/api/health'];
+const PUBLIC_PREFIXES = ['/login', '/auth', '/forgot-password', '/api/gateway', '/api/cron', '/api/health', '/install'];
 
 /**
  * Refreshes the Supabase session cookie on every navigation and redirects
