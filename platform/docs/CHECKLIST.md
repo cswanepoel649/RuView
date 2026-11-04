@@ -4,7 +4,8 @@ Legend: ✅ done & automatically tested · 🟢 done, verified by build/typechec
 
 ## 1. Research & architecture
 - ✅ Firmware, sensing-server, protocols, provisioning, OTA audited from source → `ARCHITECTURE.md` §1
-- ✅ Integration defects documented with mitigations (L1–L7); upstream fix tasks raised for L1–L3
+- ✅ Integration defects documented with mitigations (L1–L7); L1, L2, L3 and L7 since fixed upstream (re-verified after syncing with `ruvnet/RuView` v0.8.17)
+- ✅ NVS generator byte-identical to upstream `provision.py` (v0.8.17) including `security/ota_psk`
 - ✅ Gateway requirement established (UDP-only LAN uplink, OTA on LAN) — matches RuView ADR-083
 
 ## 2. Data platform (Supabase)
@@ -20,14 +21,14 @@ Legend: ✅ done & automatically tested · 🟢 done, verified by build/typechec
 - ✅ NVS partition generator byte-identical to ESP-IDF `nvs_partition_gen` (3 golden images incl. `provision.py` output, blobs, page overflow)
 - ✅ ESP32 packet codecs per firmware layout (CSI header, vitals, fused vitals vs WASM disambiguation, features)
 - ✅ Gateway protocol v1 (zod, shared by agent and API) with boundary validation tests
-- ✅ ruview-agent: UDP tap/relay (byte-for-byte), merge rules, non-live data rejection, minute aggregation, durable outbox, enrollment, heartbeat (IP/MAC/firmware), fall events, OTA executor (sha256/size/magic/900 KB gate), doctor — **16 tests incl. socket-level e2e**
+- ✅ ruview-agent: UDP tap/relay (byte-for-byte), merge rules, non-live data rejection, minute aggregation, durable outbox, enrollment, heartbeat (IP/MAC/firmware), fall events, OTA executor (sha256/size/magic, node-reported size limit), doctor — **17 tests incl. socket-level e2e**
 - ✅ End-to-end: agent → Next.js gateway routes → Postgres functions — **7 tests** (`npm run test:e2e`)
 - ✅ Firmware image validation (chip id, magic, slot size, mock scan) against the repo's real release binaries
 - ✅ MD5 (flash verify) and boot-log parser tests
 - 🟢 Browser flashing wizard (esptool-js, Web Serial) and NVS-download fallback
 - 🔌 Flash + provision a real ESP32-S3 (8 MB and 4 MB) from Chrome; confirm boot-log checks
 - 🔌 Gateway install script on a Raspberry Pi 4/5 with the published `ruvnet/wifi-densepose` image
-- 🔌 OTA of a 4 MB node through the gateway (8 MB blocked by firmware limit L3)
+- 🔌 OTA through the gateway on current firmware (8 MB and 4 MB) and the legacy-firmware block path
 - 🔌 ARP MAC observation and identity-mismatch alert with real nodes
 
 ## 4. Operations console (admin)
@@ -48,6 +49,8 @@ Legend: ✅ done & automatically tested · 🟢 done, verified by build/typechec
 - ✅ Analytics bucketing (timezone, gaps, weighting) unit-tested
 
 ## 6. Outstanding work
+- ⬜ ESP32-C6 / C5 nodes (upstream research / release-candidate targets) in the device catalogue and wizard
+- ⬜ Use upstream sensing-server semantic events (bed exit, no movement, fall risk, distress) as alert sources
 - ⬜ Browser UI tests (Playwright) against a staging Supabase project — UI is currently verified by build/typecheck/lint and manual review only
 - ⬜ Push (Web Push/PWA) and SMS notification channels — schema supports them; dispatcher marks them `skipped`
 - ⬜ Staff MFA (Supabase TOTP) enforcement in the console
@@ -62,7 +65,7 @@ Legend: ✅ done & automatically tested · 🟢 done, verified by build/typechec
 ## 7. Test commands
 ```bash
 cd platform
-npm test            # shared 19 · agent 16 · web 11
+npm test            # shared 21 · agent 17 · web 12
 npm run test:db     # 129 SQL assertions on a throwaway Postgres
 npm run test:e2e    # 7 end-to-end gateway tests
 npm run lint && npm run typecheck && npm run build

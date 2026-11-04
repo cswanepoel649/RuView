@@ -8,7 +8,7 @@ import { requireStaff } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { serverEnv } from '@/lib/env';
 import { bytes, formatDateTime, isoNow, MOTION_LABEL, STATUS_LABEL, timeAgo } from '@/lib/format';
-import { FIRMWARE_OTA_MAX_BYTES, CAPABILITY_LABEL } from '@ruview/shared/catalog';
+import { otaLimitBytes, CAPABILITY_LABEL } from '@ruview/shared/catalog';
 import type { Device, DeviceModel, DeviceStatus, FirmwareRelease, NodeState, Room } from '@/lib/types';
 import {
   cancelCommandAction, createEnrollmentCodeAction, queueOtaAction, queueProbeAction, revokeGatewayTokensAction, unassignDeviceAction, updateDeviceAction,
@@ -41,6 +41,8 @@ export default async function DeviceDetail({ params }: { params: Promise<{ devic
   const ns = nodeState.data as NodeState | null;
   const roomName = new Map(((rooms.data ?? []) as Room[]).map((r) => [r.id, r.name]));
   const appUrl = serverEnv().APP_URL;
+  const reportedOtaMax = Number((h.ota as H | undefined)?.max_size ?? 0) || null;
+  const otaLimit = otaLimitBytes(m?.flash_mb ?? 8, reportedOtaMax);
 
   return (
     <>
@@ -163,12 +165,12 @@ export default async function DeviceDetail({ params }: { params: Promise<{ devic
                   <input type="hidden" name="device_id" value={d.id} />
                   <Field label="Release" className="min-w-[220px] flex-1">
                     <Select name="release_id" required>{((releases.data ?? []) as FirmwareRelease[]).map((r) => (
-                      <option key={r.id} value={r.id} disabled={(r.app_size ?? 0) > FIRMWARE_OTA_MAX_BYTES}>{r.version} · {r.flash_size_mb} MB · {bytes(r.app_size)}{(r.app_size ?? 0) > FIRMWARE_OTA_MAX_BYTES ? ' (USB only)' : ''}</option>
+                      <option key={r.id} value={r.id} disabled={(r.app_size ?? 0) > otaLimit}>{r.version} · {r.flash_size_mb} MB · {bytes(r.app_size)}{(r.app_size ?? 0) > otaLimit ? ' (USB only)' : ''}</option>
                     ))}</Select>
                   </Field>
                   <SubmitButton>Queue OTA update</SubmitButton>
                 </ActionForm>
-                <p className="text-xs text-muted">The node firmware accepts OTA images up to {bytes(FIRMWARE_OTA_MAX_BYTES)}; larger builds must be flashed over USB in the installation wizard.</p>
+                <p className="text-xs text-muted">OTA limit for this node: {bytes(otaLimit)}{reportedOtaMax ? ' (reported by its firmware)' : ' (partition size — probe the node to confirm)'}. Firmware before the partition-sized limit accepted only 900 KB; larger builds must then be flashed over USB.</p>
               </CardBody>
             </Card>
           )}

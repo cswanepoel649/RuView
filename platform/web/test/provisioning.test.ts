@@ -26,6 +26,17 @@ describe('boot log parser (strings from firmware main.c)', () => {
     expect(s).toMatchObject({ booted: true, version: '0.6.2', nodeId: 3, ssid: 'HomeNet-2G', wifiRetries: 1, ip: '192.168.1.41',
       streamingTo: '192.168.1.20:5005', edgeTier: 2, otaAuth: true, mmwave: false, panic: false, wifiFailed: false });
   });
+  it('parses current upstream firmware (v0.8.x) wording', () => {
+    const s = [
+      'I (321) main: ESP32-S3 CSI Node (ADR-018 / ADR-110) — v0.8.17 — Node ID: 4',
+      'W (2300) main: WiFi disconnected, reason=201 rssi=0',
+      'I (2301) main: Reconnecting in 2000 ms (attempt 3)',
+      'W (9000) main: Not connected after 10 attempts -- continuing boot; reconnection keeps retrying in the background',
+      'W (9001) ota_update: No OTA PSK in NVS — OTA upload endpoint will REJECT all requests until provisioned',
+    ].reduce((acc, l) => parseBootLine(l, acc), emptyBoot());
+    expect(s).toMatchObject({ booted: true, chip: 'ESP32-S3', version: '0.8.17', nodeId: 4, wifiRetries: 3, wifiFailed: true, otaAuth: false });
+    expect(parseBootLine('I (9500) main: Got IP: 10.0.0.7', s)).toMatchObject({ ip: '10.0.0.7', wifiFailed: false });
+  });
   it('detects wifi failure and panics', () => {
     let s = parseBootLine('E (9000) main: Failed to connect to WiFi after 10 retries', emptyBoot());
     expect(s.wifiFailed).toBe(true);

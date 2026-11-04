@@ -4,10 +4,11 @@
  * ota_update → firmware/esp32-csi-node/main/ota_update.c:
  *   GET  http://<node>:8032/ota/status   {"version","running_partition",...}
  *   POST http://<node>:8032/ota          raw app image, "Authorization: Bearer <psk>"
- * The firmware rejects images > 900 KB, so we check before transferring.
+ * Current firmware accepts images up to the OTA partition and reports that limit
+ * as `max_size` in /ota/status (firmware ≤ v0.6.x reported its fixed 900 KB gate),
+ * so the node's own reported limit is checked before transferring.
  */
 import { createHash } from 'node:crypto';
-import { FIRMWARE_OTA_MAX_BYTES } from '@ruview/shared/catalog';
 import type { GatewayCommand } from '@ruview/shared/protocol';
 import type { NodeRegistry } from './nodeRegistry';
 import { errMsg, log } from './log';
@@ -22,6 +23,8 @@ export interface OtaStatus {
   reachable: boolean;
   version: string | null;
   running_partition: string | null;
+  ota_state: string | null;
+  max_size: number | null;
   checked_at: string;
 }
 
@@ -29,16 +32,19 @@ export async function getOtaStatus(ip: string, port: number, timeoutMs = 3000): 
   const checked_at = new Date().toISOString();
   try {
     const res = await fetch(`http://${ip}:${port}/ota/status`, { signal: AbortSignal.timeout(timeoutMs) });
-    if (!res.ok) return { reachable: true, version: null, running_partition: null, checked_at };
+    if (!res.ok) return { reachable: true, version: null, running_partition: null, ota_state: null, max_size: null, checked_at };
     const j = (await res.json()) as Record<string, unknown>;
+    const max = Number(j.max_size);
     return {
       reachable: true,
       version: typeof j.version === 'string' ? j.version.slice(0, 64) : null,
       running_partition: typeof j.running_partition === 'string' ? j.running_partition.slice(0, 32) : null,
+      ota_state: typeof j.ota_state === 'string' ? j.ota_state.slice(0, 32) : null,
+      max_size: Number.isInteger(max) && max > 0 ? max : null,
       checked_at,
     };
   } catch {
-    return { reachable: false, version: null, running_partition: null, checked_at };
+    return { reachable: false, version: null, running_partition: null, ota_state: null, max_size: null, checked_at };
   }
 }
 
@@ -101,11 +107,11 @@ export class CommandRunner {
   private async ota(cmd: Extract<GatewayCommand, { type: 'ota_update' }>): Promise<CommandOutcome> {
     const p = cmd.payload;
     const ip = this.nodeIp(cmd);
-    if (p.size > FIRMWARE_OTA_MAX_BYTES) {
-      return { success: false, error: `image is ${p.size} bytes; firmware OTA limit is ${FIRMWARE_OTA_MAX_BYTES} bytes — flash over USB instead` };
-    }
     const before = await getOtaStatus(ip, this.otaPort);
     if (!before.reachable) return { success: false, error: `node ${ip}:${this.otaPort} unreachable` };
+    if (before.max_size != null && p.size > before.max_size) {
+      return { success: false, error: `image is ${p.size} bytes; this node's firmware OTA limit is ${before.max_size} bytes — flash over USB instead` };
+    }
 
     log.info('ota: downloading image', { command: cmd.id, version: p.version, size: p.size });
     const dl = await fetch(p.url, { signal: AbortSignal.timeout(120_000) });
@@ -140,7 +146,7 @@ export class CommandRunner {
       if (st.reachable && st.version) {
         const ok = st.version === p.version || st.version !== before.version || st.running_partition !== before.running_partition;
         return ok
-          ? { success: true, result: { version: st.version, previous_version: before.version, running_partition: st.running_partition } }
+          ? { success: true, result: { version: st.version, previous_version: before.version, running_partition: st.running_partition, ota_state: st.ota_state, max_size: st.max_size } }
           : { success: false, error: `node came back still running ${st.version} (rollback?)` };
       }
       await sleep(this.opts.pollMs ?? 5000);

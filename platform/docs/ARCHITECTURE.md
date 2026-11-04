@@ -10,22 +10,23 @@ the platform wraps it.
 ## 1. Technical assessment of RuView (verified against source)
 
 Everything in this section was verified by reading the code in this repository
-(paths given). Marketing claims in the top-level README that are not backed by
+(paths given). Re-verified on 2026-11-04 after syncing with `ruvnet/RuView` main
+(firmware v0.8.17); items fixed upstream since the first audit are marked below. Marketing claims in the top-level README that are not backed by
 code paths used here are deliberately *not* relied on.
 
 ### 1.1 ESP32 sensor node firmware (`firmware/esp32-csi-node/`)
 
 | Aspect | Verified behaviour | Source |
 |---|---|---|
-| Supported chip | ESP32-S3 (8 MB and 4 MB flash builds). Original ESP32 / C3 unsupported. ESP32-S3 radio is **2.4 GHz only**. | `README.md`, `sdkconfig.defaults*` |
+| Supported chip | ESP32-S3 (4/8/16 MB flash builds) — the platform's production target; ESP32-S3 radio is **2.4 GHz only**. Upstream also builds an ESP32-C6 "research node" (ADR-110) and an ESP32-C5 release candidate; the platform does not provision those yet. Original ESP32 / C3 unsupported. | `README.md`, `sdkconfig.defaults*` |
 | Network role | WiFi **station**, WPA2-PSK (or open if password empty). No AP/captive-portal/BLE provisioning. | `main/main.c` `wifi_init_sta()` |
 | Uplink | **Unauthenticated, unencrypted UDP unicast** to `target_ip:target_port` (IPv4 literal only, no DNS). | `main/stream_sender.c` |
-| Packets | `0xC5110001` raw CSI (~20 Hz, always sent) · `0xC5110002` 32-byte edge vitals (1 Hz, tier ≥ 1/2) · `0xC5110004` 48-byte fused vitals **instead of** `…02` when an mmWave sensor is attached · `0xC5110004` WASM output (same magic, different layout) · `0xC5110003` feature vector · `0xC5110006` ADR-081 feature state | `main/edge_processing.h`, `main/wasm_runtime.h`, `main/rv_feature_state.h` |
+| Packets | `0xC5110001` raw CSI (~20 Hz, always sent) · `0xC5110002` 32-byte edge vitals (1 Hz, tier ≥ 1/2) · `0xC5110004` 48-byte fused vitals **instead of** `…02` when an mmWave sensor is attached · `0xC5110007` WASM output (was `0xC5110004` on firmware ≤ v0.6, issue #928) · `0xC5110003` feature vector · `0xC5110006` ADR-081 feature state | `main/edge_processing.h`, `main/wasm_runtime.h`, `main/rv_feature_state.h` |
 | Edge analytics (tier 2) | presence flag + score (auto-calibrated over first ~60 s of ambient), motion flag + motion energy, person estimate (≤ 4), fall flag (phase-acceleration threshold, 5 s cooldown), breathing/heart-rate BPM | `main/edge_processing.c` |
 | Configuration | NVS namespace `csi_cfg` read once at boot (ssid, password, target_ip, target_port, node_id, edge_tier, thresholds, hop list, TDM, MAC filter, seed bridge…). Namespace `security` key `ota_psk`. **No runtime config endpoint** — config changes require rewriting NVS over USB. | `main/nvs_config.c`, `main/ota_update.c` |
 | Provisioning | `provision.py` builds an NVS partition image (0x9000, 0x6000 bytes) and writes it with esptool over USB serial. **Full-replace semantics.** | `provision.py` |
 | Flash layout | bootloader `0x0`, partition table `0x8000`, NVS `0x9000`, otadata `0xF000`, app `0x20000` (both 8 MB and 4 MB tables) | `partitions_display.csv`, `partitions_4mb.csv` |
-| OTA | HTTP server on **port 8032 (LAN)**: `GET /ota/status`, `POST /ota` (raw app image). Bearer PSK auth **only if `security/ota_psk` is provisioned** (otherwise open). Rollback-capable dual slots. **Size gate 900 KB.** | `main/ota_update.c` |
+| OTA | HTTP server on **port 8032 (LAN)**: `GET /ota/status`, `POST /ota` (raw app image). Bearer PSK auth; current firmware **rejects all uploads when no PSK is provisioned** (≤ v0.6 was open). Size limit = target OTA partition, reported as `max_size` in `/ota/status` (≤ v0.6: fixed 900 KB). OTA images boot `pending_verify` with rollback (ADR-379). | `main/ota_update.c` |
 | WASM (tier 3, alpha) | `/wasm/upload|list|start|stop|delete` on port 8032, Ed25519-signed RVF containers | `main/wasm_upload.c` |
 | Identity | Only an 8-bit `node_id` is carried in packets. No MAC/serial in the wire protocol. | `main/csi_collector.c` |
 | Cognitum Seed bridge | Optional HTTP POST of 8-dim vectors to a Seed device (`seed_url`, bearer token) | `main/swarm_bridge.c` |
@@ -48,13 +49,13 @@ code paths used here are deliberately *not* relied on.
 
 | # | Finding | Impact on the platform | Platform mitigation |
 |---|---|---|---|
-| L1 | Sensing-server `parse_esp32_frame` (in `main.rs` and `csi.rs`) reads sequence at bytes 10–13 and RSSI at byte 14; firmware writes them at 12–15 and 16 (the hardware crate parser `esp32_parser.rs` is correct). | RSSI/sequence derived from raw CSI by the sensing server are wrong. | Gateway agent decodes RSSI itself from the correct offsets and from vitals packets. |
-| L2 | Fused vitals (mmWave nodes) and WASM output share magic `0xC5110004`; sensing server parses fused vitals as WASM events. | Presence/fall from mmWave-equipped nodes never reaches sensing-server edge-vitals. | Agent disambiguates by layout (48-byte fused vs `8+5n` WASM) and decodes fused packets directly. |
-| L3 | OTA size gate is 900 KB but the current 8 MB app image is ~990 KB (4 MB image ~774 KB). | `POST /ota` rejects the 8 MB build. | Platform blocks OTA dispatch when `app_size > 900 KB` with an explicit message; USB re-flash via the wizard remains available. |
+| L1 | Sensing-server `parse_esp32_frame` (in `main.rs` and `csi.rs`) reads sequence at bytes 10–13 and RSSI at byte 14; firmware writes them at 12–15 and 16 (the hardware crate parser `esp32_parser.rs` is correct). | RSSI/sequence derived from raw CSI by the sensing server are wrong. | **Fixed upstream** (`csi.rs` reads 12–15 / 16). Agent still decodes RSSI itself, so either server version works. |
+| L2 | Fused vitals (mmWave nodes) and WASM output share magic `0xC5110004`; sensing server parses fused vitals as WASM events. | Presence/fall from mmWave-equipped nodes never reaches sensing-server edge-vitals. | **Fixed upstream**: WASM output now uses `0xC5110007`. Agent decodes both, keeping layout disambiguation for legacy `0xC5110004` WASM packets. |
+| L3 | OTA size gate was 900 KB while the 8 MB app was ~990 KB. | `POST /ota` rejected the 8 MB build on legacy firmware. | **Fixed upstream** (limit = partition size). Platform and agent use the node-reported `max_size`, so legacy nodes are still blocked with an explanatory message and USB re-flash remains available. |
 | L4 | `--source auto` fabricates data when hardware is silent. | Simulated data could be shown as real. | Gateway runs sensing-server with `--source esp32`; agent **drops any update whose source is not `esp32`**. |
 | L5 | No authentication/encryption on the UDP uplink. | A LAN attacker can spoof sensor packets. | Documented risk; nodes are bound to a gateway + node_id + ARP-observed MAC; the agent flags MAC/IP changes. Hardening requires firmware work (ADR-032 secure TDM). |
 | L6 | No remote NVS write. | Remote config (thresholds, WiFi) impossible without USB. | Platform keeps *desired* vs *provisioned* config and flags drift; re-provisioning happens through the browser wizard. |
-| L7 | OTA open if no PSK. | Anyone on the LAN can reflash. | Platform **always** generates a per-device 256-bit OTA PSK and writes it into NVS at provisioning. |
+| L7 | OTA open if no PSK (≤ v0.6). | Anyone on the LAN could reflash. | **Fixed upstream** (fail-closed). Platform always generates a per-device 256-bit PSK (64 hex, the format `provision.py` now requires). |
 
 ### 1.4 Is a local gateway required? — **Yes.**
 
@@ -211,7 +212,7 @@ exact `esptool` + `provision.py` commands with the allocated values.
 Admin selects a published release → `device_commands(ota_update)` → delivered on next
 heartbeat with a 1 h signed URL, SHA-256, size and decrypted PSK → agent verifies hash, POSTs to
 `http://<node-ip>:8032/ota`, polls `/ota/status` for the new version. Platform refuses dispatch
-when the image exceeds the firmware's 900 KB gate (L3).
+when the image exceeds the node's reported OTA limit (`max_size`; L3).
 
 ---
 

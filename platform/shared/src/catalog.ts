@@ -26,8 +26,23 @@ export const CAPABILITY_LABEL: Record<string, string> = {
   ota_proxy: 'OTA proxy',
 };
 
-/** Firmware OTA endpoint rejects images above this size (main/ota_update.c OTA_MAX_SIZE). */
-export const FIRMWARE_OTA_MAX_BYTES = 900 * 1024;
+/**
+ * OTA size limits (firmware/esp32-csi-node/main/ota_update.c).
+ * Current firmware accepts images up to the target OTA partition and reports it as
+ * `max_size` in GET /ota/status; firmware ≤ v0.6.x used a fixed 900 KB gate (and
+ * reported max_size = 921600). The device-reported value is authoritative.
+ */
+export const LEGACY_OTA_MAX_BYTES = 900 * 1024;
+
+/** ota_0 size in partitions_display.csv (8/16 MB) and partitions_4mb.csv. */
+export function otaSlotBytes(flashMb: number): number {
+  return flashMb >= 8 ? 0x200000 : 0x1d0000;
+}
+
+/** Effective OTA limit: the node's reported max_size when known, otherwise the slot size. */
+export function otaLimitBytes(flashMb: number, reportedMaxSize?: number | null): number {
+  return reportedMaxSize && reportedMaxSize > 0 ? reportedMaxSize : otaSlotBytes(flashMb);
+}
 
 /** Flash offsets shared by partitions_display.csv (8 MB) and partitions_4mb.csv. */
 export const FLASH_LAYOUT = {

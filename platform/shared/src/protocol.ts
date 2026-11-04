@@ -97,6 +97,8 @@ export const NodeReport = z.object({
     reachable: z.boolean(),
     version: z.string().max(64).nullable().optional(),
     running_partition: z.string().max(32).nullable().optional(),
+    ota_state: z.string().max(32).nullable().optional(),
+    max_size: z.int().min(0).nullable().optional(),
     checked_at: isoTime,
   }).nullable().optional(),
 });
@@ -134,7 +136,7 @@ export const OtaPayload = z.object({
   url: z.url(),
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
   size: z.int().positive(),
-  psk: z.string().min(32).max(64),
+  psk: z.string().regex(/^[0-9a-f]{64}$/),
 });
 
 const CommandBase = z.object({

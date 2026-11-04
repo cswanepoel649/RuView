@@ -5,7 +5,7 @@
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 PGBIN="${PGBIN:-$(ls -d /usr/lib/postgresql/*/bin 2>/dev/null | sort -V | tail -1)}"
-PORT="${PGPORT_TEST:-54329}"
+PORT="${PGPORT_TEST:-54339}"
 
 _run() { if [ "$(id -u)" = "0" ]; then su postgres -s /bin/sh -c "$*"; else sh -c "$*"; fi; }
 

@@ -21,7 +21,7 @@ create table public.device_models (
 insert into public.device_models (id, kind, manufacturer, name, chip, flash_mb, firmware_family, capabilities, provisioning, supported, notes) values
   ('esp32s3-8mb', 'sensor_node', 'Espressif', 'ESP32-S3 CSI node (8 MB flash)', 'ESP32-S3', 8, 'esp32-csi-node',
    array['csi','presence','motion','person_estimate','fall','vitals','ota','wasm'], 'web_serial', true,
-   'RuView esp32-csi-node firmware. 2.4 GHz WiFi only. Note: OTA size gate 900 KB (see L3).'),
+   'RuView esp32-csi-node firmware. 2.4 GHz WiFi only. OTA limit = partition size (firmware <= v0.6: 900 KB).'),
   ('esp32s3-4mb', 'sensor_node', 'Espressif', 'ESP32-S3 SuperMini CSI node (4 MB flash)', 'ESP32-S3', 4, 'esp32-csi-node',
    array['csi','presence','motion','person_estimate','fall','vitals','ota','wasm'], 'web_serial', true,
    'Compact 4 MB build (partitions_4mb.csv).'),

@@ -32,6 +32,16 @@ describe('NVS generator — byte-exact with ESP-IDF nvs_partition_gen', () => {
     expect(firstDiff(img, golden)).toBe(-1);
   });
 
+  it('matches upstream provision.py (firmware v0.8.17) including security/ota_psk', () => {
+    // python provision.py ... --ota-psk-file <64×'b'> --dry-run (same args as above)
+    const img = buildProvisioningNvs({
+      ssid: 'HomeNet-2G', password: 'correct horse battery', targetIp: '192.168.1.20', targetPort: 5005,
+      nodeId: 3, edgeTier: 2, fallThresh: 15000, vitalIntervalMs: 1000, channel: 6,
+      filterMac: 'AA:BB:CC:DD:EE:01', hopChannels: [1, 6, 11], hopDwellMs: 200, zone: 'lobby', otaPsk: 'b'.repeat(64),
+    });
+    expect(firstDiff(img, fx('provision_py_v0817_psk_golden.bin'))).toBe(-1);
+  });
+
   it('matches reference for the full platform image (security namespace, blobs, unicode, open network)', () => {
     const img = buildProvisioningNvs({
       ssid: 'Café-Ω', password: '', targetIp: '10.0.0.2', targetPort: 5005, nodeId: 254,
@@ -65,6 +75,7 @@ describe('provisioning validation', () => {
     expect(() => validateProvisioningConfig({ ...base, nodeId: 300 })).toThrow();
     expect(() => validateProvisioningConfig({ ...base, tdmSlot: 3, tdmTotal: 3 })).toThrow();
     expect(() => validateProvisioningConfig({ ...base, otaPsk: 'NOT-HEX' })).toThrow();
+    expect(() => validateProvisioningConfig({ ...base, otaPsk: 'a'.repeat(32) })).toThrow(/exactly 64/);
     expect(() => validateProvisioningConfig({ ...base, channel: 20 })).toThrow();
   });
   it('always writes WiFi trio + node id first (full-replace semantics)', () => {

@@ -86,10 +86,11 @@ function wsSend(text: string) {
 
 // ------------------------------------------------- fake ESP32 OTA endpoint
 let nodeVersion = '0.6.2';
+let nodeMaxSize = 921_600; // legacy firmware reports its fixed 900 KB gate
 let otaUploads: { auth?: string; size: number }[] = [];
 const PSK = 'b'.repeat(64);
 const otaSrv = http.createServer(async (req, res) => {
-  if (req.url === '/ota/status') { res.writeHead(200); res.end(JSON.stringify({ version: nodeVersion, running_partition: nodeVersion === '0.6.2' ? 'ota_0' : 'ota_1' })); return; }
+  if (req.url === '/ota/status') { res.writeHead(200); res.end(JSON.stringify({ version: nodeVersion, running_partition: nodeVersion === '0.6.2' ? 'ota_0' : 'ota_1', ota_state: 'valid', max_size: nodeMaxSize })); return; }
   if (req.url === '/ota' && req.method === 'POST') {
     const b = await readBody(req);
     otaUploads.push({ auth: req.headers.authorization, size: b.length });
@@ -216,8 +217,20 @@ describe('ruview-agent end to end', () => {
     await Promise.all(agent.pending);
     const byId = (id: string) => cloud.results.find((r) => r.url.includes(id));
     expect(byId('4c1f5f1e')).toMatchObject({ success: false, error: expect.stringMatching(/sha256 mismatch/) });
-    expect(byId('5c1f5f1e')).toMatchObject({ success: false, error: expect.stringMatching(/OTA limit/) });
+    expect(byId('5c1f5f1e')).toMatchObject({ success: false, error: expect.stringMatching(/OTA limit is 921600/) });
     expect(otaUploads).toEqual([]);
+  });
+
+  it('uses the limit reported by current firmware (partition-sized OTA)', async () => {
+    nodeMaxSize = 0x200000; // current firmware: ota_1 partition size
+    otaUploads = [];
+    const big = 1_120_384; // upstream 8 MB app image size
+    cloud.commands.push({ id: '6c1f5f1e-1111-4a22-8b33-444455556666', device_id: 'f1b2c3d4-0000-4000-8000-000000000001', attempt: 1, node_id: 1, node_ip: null, type: 'ota_update',
+      payload: { release_id: '9f1f5f1e-1111-4a22-8b33-444455556666', version: '0.8.17', url: `http://127.0.0.1:${ports.cloud}/fw.bin`, sha256: FW_SHA, size: big, psk: PSK } });
+    await agent.heartbeat();
+    await Promise.all(agent.pending);
+    // passes the size gate and proceeds to download; fails only on the (deliberately) mismatched size
+    expect(cloud.results.find((r) => r.url.includes('6c1f5f1e'))).toMatchObject({ success: false, error: expect.stringMatching(/size mismatch/) });
   });
 
   it('buffers minute buckets while the cloud is down and replays them', async () => {

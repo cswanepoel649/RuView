@@ -1,5 +1,5 @@
 import { HeartbeatRequest } from '@ruview/shared/protocol';
-import { FIRMWARE_OTA_MAX_BYTES } from '@ruview/shared/catalog';
+import { otaSlotBytes } from '@ruview/shared/catalog';
 import { adminClient } from '@/lib/supabase/admin';
 import { decryptSecret } from '@/lib/crypto';
 import { authenticateGateway, clientIp, handle, json, pgError, readJson } from '@/lib/gateway-api';
@@ -34,10 +34,11 @@ async function enrich(c: RawCommand) {
   const db = adminClient();
   if (c.type !== 'ota_update') return { ...c, payload: c.payload ?? {} };
   const releaseId = String(c.payload.release_id ?? '');
-  const { data: rel } = await db.from('firmware_releases').select('id, version, status, files').eq('id', releaseId).single();
+  const { data: rel } = await db.from('firmware_releases').select('id, version, status, files, flash_size_mb').eq('id', releaseId).single();
   const app = (rel?.files as Record<string, { path: string; size: number; sha256: string }> | undefined)?.app;
   if (!rel || rel.status !== 'published' || !app) throw new Error('release not published or has no app image');
-  if (app.size > FIRMWARE_OTA_MAX_BYTES) throw new Error(`app image ${app.size} B exceeds firmware OTA limit ${FIRMWARE_OTA_MAX_BYTES} B`);
+  // The agent enforces the node's own reported limit (/ota/status max_size); this is a slot-size sanity check.
+  if (app.size > otaSlotBytes(rel.flash_size_mb as number)) throw new Error(`app image ${app.size} B does not fit the OTA partition`);
   const { data: secret } = await db.from('device_secrets').select('ota_psk_ciphertext').eq('device_id', c.device_id).single();
   if (!secret) throw new Error('device has no OTA PSK (re-provision over USB)');
   const { data: signed, error } = await db.storage.from('firmware').createSignedUrl(app.path, 3600);

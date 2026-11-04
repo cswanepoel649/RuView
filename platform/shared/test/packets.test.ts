@@ -33,11 +33,16 @@ describe('ESP32 packet codecs', () => {
       expect(fused.mmwave?.distanceCm).toBe(140);
       expect(fused.mmwave?.present).toBe(true);
     }
-    const wasm = decodeFusedOrWasm(encodeWasmOutput(7, 1, [{ type: 3, value: 0.5 }, { type: 9, value: -1 }]))!;
+    const wasm = decodeFusedOrWasm(encodeWasmOutput(7, 1, [{ type: 3, value: 0.5 }, { type: 9, value: -1 }], MAGIC.FUSED_OR_WASM))!;
     expect(wasm).toEqual({ kind: 'wasm', nodeId: 7, moduleId: 1, events: [{ type: 3, value: 0.5 }, { type: 9, value: -1 }] });
     // 8-event WASM packet is also 48 bytes — must still be WASM
-    const eight = decodeFusedOrWasm(encodeWasmOutput(7, 1, Array.from({ length: 8 }, (_, i) => ({ type: i, value: i }))))!;
+    const eight = decodeFusedOrWasm(encodeWasmOutput(7, 1, Array.from({ length: 8 }, (_, i) => ({ type: i, value: i })), MAGIC.FUSED_OR_WASM))!;
     expect(eight.kind).toBe('wasm');
+  });
+  it('decodes WASM output on its own magic 0xC5110007 (current firmware, #928)', () => {
+    const p = decodePacket(encodeWasmOutput(2, 0, [{ type: 1, value: 2.5 }]))!;
+    expect(p).toEqual({ kind: 'wasm', nodeId: 2, moduleId: 0, events: [{ type: 1, value: 2.5 }] });
+    expect(MAGIC.WASM_OUTPUT).toBe(0xc5110007);
   });
   it('ignores unknown or malformed datagrams', () => {
     expect(decodePacket(new Uint8Array([1, 2, 3]))).toBeNull();

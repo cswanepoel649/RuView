@@ -93,8 +93,8 @@ export function validateProvisioningConfig(c: NodeProvisioningConfig): void {
   if (c.zone !== undefined && enc.encode(c.zone).length > 15) throw new NvsError('zone name too long (max 15)');
   intIn('swarmHeartbeatS', c.swarmHeartbeatS, 0, 65535);
   intIn('swarmIngestS', c.swarmIngestS, 0, 65535);
-  if (c.otaPsk !== undefined && !/^[0-9a-f]{32,64}$/.test(c.otaPsk)) {
-    throw new NvsError('otaPsk must be 32-64 lowercase hex characters');
+  if (c.otaPsk !== undefined && !/^[0-9a-f]{64}$/.test(c.otaPsk)) {
+    throw new NvsError('otaPsk must be exactly 64 lowercase hex characters (firmware ota_psk buffer / provision.py)');
   }
 }
 

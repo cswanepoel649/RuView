@@ -6,7 +6,8 @@
  *   0xC5110002 edge_processing.h edge_vitals_pkt_t (32 B)
  *   0xC5110003 edge_processing.h edge_feature_pkt_t (48 B)
  *   0xC5110004 edge_processing.h edge_fused_vitals_pkt_t (48 B)  — mmWave nodes
- *   0xC5110004 wasm_runtime.h WASM output (8 + 5n B)              — same magic!
+ *   0xC5110007 wasm_runtime.h WASM output (8 + 5n B)              — current firmware (#928)
+ *   0xC5110004 WASM output on firmware ≤ v0.6.x (shared fused-vitals magic; disambiguated by layout)
  *   0xC5110005 compressed CSI, 0xC5110006 ADR-081 feature state  (counted, not decoded)
  */
 
@@ -15,6 +16,7 @@ export const MAGIC = {
   VITALS: 0xc5110002,
   FEATURES: 0xc5110003,
   FUSED_OR_WASM: 0xc5110004,
+  WASM_OUTPUT: 0xc5110007,
   COMPRESSED: 0xc5110005,
   FEATURE_STATE: 0xc5110006,
 } as const;
@@ -159,6 +161,19 @@ export function decodeFusedOrWasm(buf: Uint8Array): EdgeVitals | WasmOutput | nu
     return v;
   }
   if (!looksWasm) return null;
+  return parseWasm(buf);
+}
+
+/** WASM output packet (0xC5110007 on current firmware). */
+export function decodeWasmOutput(buf: Uint8Array): WasmOutput | null {
+  if (buf.length < 8 || packetMagic(buf) !== MAGIC.WASM_OUTPUT) return null;
+  const count = dv(buf).getUint16(6, true);
+  return buf.length === 8 + 5 * count ? parseWasm(buf) : null;
+}
+
+function parseWasm(buf: Uint8Array): WasmOutput {
+  const d = dv(buf);
+  const count = d.getUint16(6, true);
   const events: WasmOutput['events'] = [];
   for (let i = 0; i < count; i++) {
     const o = 8 + i * 5;
@@ -181,6 +196,7 @@ export function decodePacket(buf: Uint8Array): DecodedPacket | null {
     case MAGIC.CSI_FRAME: return decodeCsiFrame(buf);
     case MAGIC.VITALS: return decodeVitals(buf);
     case MAGIC.FUSED_OR_WASM: return decodeFusedOrWasm(buf);
+    case MAGIC.WASM_OUTPUT: return decodeWasmOutput(buf);
     case MAGIC.FEATURES: return decodeFeatureVector(buf);
     case MAGIC.COMPRESSED: return buf.length >= 5 ? { kind: 'compressed', nodeId: buf[4]! } : null;
     case MAGIC.FEATURE_STATE: return buf.length >= 5 ? { kind: 'feature_state', nodeId: buf[4]! } : null;
@@ -243,10 +259,10 @@ export function encodeFusedVitals(v: Omit<EdgeVitals, 'kind'>): Uint8Array {
   return b;
 }
 
-export function encodeWasmOutput(nodeId: number, moduleId: number, events: { type: number; value: number }[]): Uint8Array {
+export function encodeWasmOutput(nodeId: number, moduleId: number, events: { type: number; value: number }[], magic: number = MAGIC.WASM_OUTPUT): Uint8Array {
   const b = new Uint8Array(8 + events.length * 5);
   const d = dv(b);
-  d.setUint32(0, MAGIC.FUSED_OR_WASM, true);
+  d.setUint32(0, magic, true);
   d.setUint8(4, nodeId);
   d.setUint8(5, moduleId);
   d.setUint16(6, events.length, true);

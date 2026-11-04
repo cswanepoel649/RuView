@@ -2,7 +2,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { FIRMWARE_OTA_MAX_BYTES } from '@ruview/shared/catalog';
+import { otaLimitBytes } from '@ruview/shared/catalog';
 import { requireStaff } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { adminClient } from '@/lib/supabase/admin';
@@ -124,14 +124,16 @@ export async function queueOtaAction(_: ActionResult, fd: FormData): Promise<Act
   if (!p.ok) return p.result;
   const db = await createClient();
   const [{ data: dev }, { data: rel }] = await Promise.all([
-    db.from('devices').select('id, kind, model_id, gateway_id, property_id, status').eq('id', p.data.device_id).single(),
-    db.from('firmware_releases').select('id, version, status, model_ids, app_size, is_mock_build').eq('id', p.data.release_id).single(),
+    db.from('devices').select('id, kind, model_id, gateway_id, property_id, status, health').eq('id', p.data.device_id).single(),
+    db.from('firmware_releases').select('id, version, status, model_ids, app_size, is_mock_build, flash_size_mb').eq('id', p.data.release_id).single(),
   ]);
   if (!dev || dev.kind !== 'sensor_node' || !dev.gateway_id) return { error: 'OTA requires a sensor node attached to a gateway.' };
   if (!rel || rel.status !== 'published' || rel.is_mock_build) return { error: 'Only published, non-mock releases can be deployed.' };
   if (!(rel.model_ids as string[]).includes(dev.model_id as string)) return { error: `Release ${rel.version} is not built for model ${dev.model_id}.` };
-  if ((rel.app_size ?? 0) > FIRMWARE_OTA_MAX_BYTES) {
-    return { error: `This image is ${rel.app_size} bytes; the node firmware rejects OTA uploads above ${FIRMWARE_OTA_MAX_BYTES} bytes. Re-flash over USB from the installation wizard instead.` };
+  const reported = Number(((dev.health as { ota?: { max_size?: number } } | null)?.ota?.max_size) ?? 0) || null;
+  const limit = otaLimitBytes(rel.flash_size_mb as number, reported);
+  if ((rel.app_size ?? 0) > limit) {
+    return { error: `This image is ${rel.app_size} bytes; ${reported ? "this node's firmware reports" : 'the OTA partition allows'} at most ${limit} bytes. Re-flash over USB from the installation wizard instead.` };
   }
   const { data: hasSecret } = await adminClient().from('device_secrets').select('device_id').eq('device_id', dev.id).maybeSingle();
   if (!hasSecret) return { error: 'This node has no OTA key on record (not provisioned by the platform). Re-provision it over USB first.' };

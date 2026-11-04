@@ -6,6 +6,53 @@ per monitored property. ESP32 nodes are flashed in the browser during installati
 
 ---
 
+## 0. Local development (laptop)
+
+Prerequisites: Node 20+, Docker Desktop (for the local Supabase stack), `openssl`.
+
+```bash
+cd platform
+npm ci
+npx supabase@2.58.5 start        # starts Postgres/Auth/Storage/Realtime and applies supabase/migrations
+npx supabase@2.58.5 status       # prints API URL, publishable (anon) + secret (service_role) keys, Studio and Mailpit URLs
+```
+
+Create `web/.env.local` (git-ignored) from `web/.env.example`:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<anon / publishable key from status>
+SUPABASE_SECRET_KEY=<service_role / secret key from status>
+APP_URL=http://localhost:3000
+DEVICE_SECRET_KEY=<openssl rand -hex 32>
+CRON_SECRET=<openssl rand -hex 32>
+```
+
+Create the first administrator (sign-ups are disabled): open Studio (`http://127.0.0.1:54323`) →
+Authentication → **Add user** (email + password, auto-confirm), then in the SQL editor:
+
+```sql
+update public.profiles set platform_role = 'platform_admin' where email = 'you@example.com';
+```
+
+Run the app and sign in at `http://localhost:3000`:
+
+```bash
+npm run dev -w @ruview/web
+```
+
+Invite emails sent by the local stack land in Mailpit (`http://127.0.0.1:54324`). `pg_cron` runs
+offline detection every minute; to deliver queued alert emails locally call
+`curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/notifications`.
+Re-create the database from the migrations at any time with `npx supabase@2.58.5 db reset`.
+
+Testing a real gateway against your laptop: build and publish the gateway kit
+(`npm run build -w @ruview/gateway-agent && node scripts/publish-gateway-kit.mjs`), start the
+app on the LAN (`npm run dev -w @ruview/web -- -H 0.0.0.0`), set `APP_URL=http://<laptop-ip>:3000`,
+and add `RUVIEW_ALLOW_INSECURE_HTTP=1` to the installer command (the agent otherwise requires https).
+
+---
+
 ## 1. Supabase project
 
 1. Create a project (Pro plan recommended for production: daily backups, PITR, pg_cron).
@@ -81,9 +128,9 @@ re-reads every file from Storage and verifies the ESP32-S3 chip id, image magic,
 magic, OTA slot size and SHA-256, and scans for mock-CSI code (mock builds can never be published).
 Test on a real board, then **Publish**.
 
-> The node firmware rejects OTA uploads above 900 KB (`ota_update.c`). The current 8 MB app is
-> ~990 KB, so 8 MB nodes can only be updated over USB until the firmware limit is raised. The
-> platform blocks such OTA requests with an explanatory message.
+> Current firmware accepts OTA images up to its partition size and reports the limit in
+> `/ota/status`. Nodes still running older firmware (fixed 900 KB gate) must be re-flashed over
+> USB once; the platform uses each node's reported limit and explains when USB is required.
 
 ## 4. Home gateway (per property)
 
