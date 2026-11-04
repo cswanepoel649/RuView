@@ -52,7 +52,7 @@ export async function createReleaseAction(input: unknown): Promise<{ ok: boolean
 
 export async function setReleaseStatusAction(fd: FormData) {
   await requireAdmin();
-  const id = z.uuid().parse(fd.get('id'));
+  const id = z.guid().parse(fd.get('id'));
   const status = z.enum(['published', 'deprecated', 'draft']).parse(fd.get('status'));
   const db = await createClient();
   await db.from('firmware_releases').update({ status, ...(status === 'published' ? { published_at: new Date().toISOString() } : {}) }).eq('id', id);

@@ -10,7 +10,7 @@ export async function GET(_: Request, ctx: { params: Promise<{ releaseId: string
   const s = await getSession();
   if (!s?.isStaff) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   const { releaseId, role } = await ctx.params;
-  if (!z.uuid().safeParse(releaseId).success || !['bootloader', 'partition_table', 'ota_data', 'app'].includes(role)) {
+  if (!z.guid().safeParse(releaseId).success || !['bootloader', 'partition_table', 'ota_data', 'app'].includes(role)) {
     return NextResponse.json({ error: 'bad request' }, { status: 400 });
   }
   const db = await createClient();

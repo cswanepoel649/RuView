@@ -30,7 +30,7 @@ export async function inviteStaffAction(_: ActionResult, fd: FormData): Promise<
 
 export async function setStaffRoleAction(fd: FormData) {
   const s = await requireAdmin();
-  const id = z.uuid().parse(fd.get('id'));
+  const id = z.guid().parse(fd.get('id'));
   const role = z.enum(['platform_admin', 'installer', 'none']).parse(fd.get('role'));
   if (id === s.userId) return; // never demote yourself (avoids locking out the last admin)
   const db = await createClient();

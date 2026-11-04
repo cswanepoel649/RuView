@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 /** Acknowledge / resolve via RPCs that re-check authorisation (staff or client owner/member). */
 export async function eventAction(fd: FormData) {
   await requireSession();
-  const id = z.uuid().parse(fd.get('id'));
+  const id = z.guid().parse(fd.get('id'));
   const op = z.enum(['ack', 'resolve']).parse(fd.get('op'));
   const note = z.string().max(1000).optional().parse(fd.get('note') || undefined);
   const db = await createClient();

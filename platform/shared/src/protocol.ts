@@ -129,7 +129,7 @@ export const HeartbeatRequest = z.object({
 export type HeartbeatRequest = z.infer<typeof HeartbeatRequest>;
 
 export const OtaPayload = z.object({
-  release_id: z.uuid(),
+  release_id: z.guid(),
   version: z.string(),
   url: z.url(),
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
@@ -138,8 +138,8 @@ export const OtaPayload = z.object({
 });
 
 const CommandBase = z.object({
-  id: z.uuid(),
-  device_id: z.uuid(),
+  id: z.guid(),
+  device_id: z.guid(),
   attempt: z.int(),
   node_id: nodeId.nullable(),
   node_ip: z.string().nullable(),
@@ -153,7 +153,7 @@ export type GatewayCommand = z.infer<typeof GatewayCommand>;
 
 export const HeartbeatResponse = z.object({
   server_time: isoTime,
-  property_id: z.uuid().nullable(),
+  property_id: z.guid().nullable(),
   config: z.object({
     telemetry_interval_s: z.int().min(1).max(300),
     heartbeat_interval_s: z.int().min(5).max(600),
@@ -161,8 +161,8 @@ export const HeartbeatResponse = z.object({
   }),
   node_map: z.array(z.object({
     node_id: nodeId,
-    device_id: z.uuid(),
-    room_id: z.uuid().nullable(),
+    device_id: z.guid(),
+    room_id: z.guid().nullable(),
     name: z.string(),
     hw_id: z.string().nullable(),
   })),
@@ -187,8 +187,8 @@ export const EnrollRequest = z.object({
 export type EnrollRequest = z.infer<typeof EnrollRequest>;
 
 export const EnrollResponse = z.object({
-  gateway_id: z.uuid(),
-  property_id: z.uuid().nullable(),
+  gateway_id: z.guid(),
+  property_id: z.guid().nullable(),
   token: z.string().startsWith('gw_'),
 });
 export type EnrollResponse = z.infer<typeof EnrollResponse>;

@@ -15,7 +15,7 @@ const p = (id: string) => `/admin/installations/${id}`;
 
 export async function createInstallationAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
   const s = await requireStaff();
-  const parsed = parseForm(z.object({ property_id: z.uuid(), scheduled_for: z.string().optional() }), fd);
+  const parsed = parseForm(z.object({ property_id: z.guid(), scheduled_for: z.string().optional() }), fd);
   if (!parsed.ok) return parsed.result;
   const db = await createClient();
   const { data, error } = await db.from('installations').insert({
@@ -35,7 +35,7 @@ async function loadInstall(installationId: string) {
 
 export async function markStepAction(installationId: string, step: string, done: boolean, extra?: Record<string, unknown>) {
   await requireStaff();
-  z.uuid().parse(installationId);
+  z.guid().parse(installationId);
   z.enum(['survey', 'gateway', 'sensors', 'verify', 'handover']).parse(step);
   const { db, inst } = await loadInstall(installationId);
   const steps = { ...inst.steps, [step]: { ...(inst.steps[step] as object), ...extra, done, at: new Date().toISOString() } };
@@ -45,7 +45,7 @@ export async function markStepAction(installationId: string, step: string, done:
 
 export async function markRoomVerifiedAction(installationId: string, roomId: string, verified: boolean) {
   await requireStaff();
-  z.uuid().parse(roomId);
+  z.guid().parse(roomId);
   const { db, inst } = await loadInstall(installationId);
   const verify = (inst.steps.verify ?? {}) as { rooms?: Record<string, string | null> };
   const rooms = { ...(verify.rooms ?? {}), [roomId]: verified ? new Date().toISOString() : null };
@@ -55,7 +55,7 @@ export async function markRoomVerifiedAction(installationId: string, roomId: str
 
 export async function createGatewayAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
   await requireStaff();
-  const parsed = parseForm(z.object({ installation_id: z.uuid(), name: reqStr(120), model_id: z.enum(['gateway-rpi', 'gateway-linux']) }), fd);
+  const parsed = parseForm(z.object({ installation_id: z.guid(), name: reqStr(120), model_id: z.enum(['gateway-rpi', 'gateway-linux']) }), fd);
   if (!parsed.ok) return parsed.result;
   const { db, inst } = await loadInstall(parsed.data.installation_id);
   const { error } = await db.from('devices').insert({ kind: 'gateway', model_id: parsed.data.model_id, name: parsed.data.name, property_id: inst.property_id, status: 'assigned' });
@@ -65,7 +65,7 @@ export async function createGatewayAction(_: ActionResult, fd: FormData): Promis
 }
 
 const Prepare = z.object({
-  installationId: z.uuid(), gatewayId: z.uuid(), roomId: z.uuid(),
+  installationId: z.guid(), gatewayId: z.guid(), roomId: z.guid(),
   mac: z.string().regex(/^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/), chip: z.string(), flashSize: z.string().nullable(),
   name: z.string().min(1).max(120),
 });
@@ -112,8 +112,8 @@ export async function prepareProvisioningAction(input: z.infer<typeof Prepare>):
 }
 
 const Complete = z.object({
-  installationId: z.uuid(), deviceId: z.uuid(), otaPsk: z.string().regex(/^[0-9a-f]{64}$/),
-  releaseId: z.uuid().nullable(), firmwareVersion: z.string().max(64).nullable(),
+  installationId: z.guid(), deviceId: z.guid(), otaPsk: z.string().regex(/^[0-9a-f]{64}$/),
+  releaseId: z.guid().nullable(), firmwareVersion: z.string().max(64).nullable(),
   config: z.record(z.string(), z.unknown()), bootCheck: z.record(z.string(), z.unknown()).optional(),
 });
 export async function completeProvisioningAction(input: z.infer<typeof Complete>): Promise<{ ok: boolean; error?: string }> {
@@ -135,7 +135,7 @@ export async function completeProvisioningAction(input: z.infer<typeof Complete>
 
 export async function completeInstallationAction(fd: FormData) {
   await requireStaff();
-  const id = z.uuid().parse(fd.get('id'));
+  const id = z.guid().parse(fd.get('id'));
   const { db, inst } = await loadInstall(id);
   await db.from('installations').update({ status: 'completed', completed_at: new Date().toISOString(), steps: { ...inst.steps, handover: { done: true, at: new Date().toISOString() } } }).eq('id', id);
   await db.from('properties').update({ status: 'active' }).eq('id', inst.property_id).in('status', ['planned', 'installing']);
@@ -145,7 +145,7 @@ export async function completeInstallationAction(fd: FormData) {
 
 export async function cancelInstallationAction(fd: FormData) {
   await requireStaff();
-  const id = z.uuid().parse(fd.get('id'));
+  const id = z.guid().parse(fd.get('id'));
   const db = await createClient();
   await db.from('installations').update({ status: 'cancelled' }).eq('id', id);
   redirect('/admin/installations');

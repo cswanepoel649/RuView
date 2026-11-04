@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 export const POST = handle(async (req, ctx) => {
   const gatewayId = await authenticateGateway(req);
-  const id = z.uuid().safeParse((await ctx.params).id);
+  const id = z.guid().safeParse((await ctx.params).id);
   if (!id.success) throw new ApiError(400, 'invalid command id');
   const body = await readJson(req, CommandResult);
   const { error } = await adminClient().rpc('gateway_complete_command', {

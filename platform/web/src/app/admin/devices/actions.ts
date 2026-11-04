@@ -29,9 +29,9 @@ export async function registerDeviceAction(_: ActionResult, fd: FormData): Promi
 }
 
 const AssignForm = z.object({
-  device_id: z.uuid(), property_id: z.uuid(),
-  room_id: z.union([z.literal(''), z.uuid()]).transform((v) => v || null),
-  gateway_id: z.union([z.literal(''), z.uuid()]).transform((v) => v || null),
+  device_id: z.guid(), property_id: z.guid(),
+  room_id: z.union([z.literal(''), z.guid()]).transform((v) => v || null),
+  gateway_id: z.union([z.literal(''), z.guid()]).transform((v) => v || null),
 });
 export async function assignDeviceAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
   await requireStaff();
@@ -70,7 +70,7 @@ export async function assignDevice(a: z.infer<typeof AssignForm>): Promise<Actio
 
 export async function unassignDeviceAction(fd: FormData) {
   await requireStaff();
-  const id = z.uuid().parse(fd.get('id'));
+  const id = z.guid().parse(fd.get('id'));
   const db = await createClient();
   const { data: d } = await db.from('devices').select('property_id').eq('id', id).single();
   await db.from('devices').update({ property_id: null, room_id: null, gateway_id: null, node_id: null, client_id: null, status: 'inventory' }).eq('id', id);
@@ -79,7 +79,7 @@ export async function unassignDeviceAction(fd: FormData) {
 }
 
 const UpdateForm = z.object({
-  id: z.uuid(), name: reqStr(120), room_id: z.union([z.literal(''), z.uuid()]).transform((v) => v || null),
+  id: z.guid(), name: reqStr(120), room_id: z.union([z.literal(''), z.guid()]).transform((v) => v || null),
   status: z.enum(['inventory', 'assigned', 'provisioned', 'online', 'offline', 'fault', 'retired']),
   serial_number: optStr(80), mount_notes: optStr(1000), notes: optStr(2000),
 });
@@ -97,7 +97,7 @@ export async function updateDeviceAction(_: ActionResult, fd: FormData): Promise
 /** One-time gateway enrollment code (24 h). Only its hash is stored; shown once. */
 export async function createEnrollmentCodeAction(gatewayId: string): Promise<{ ok: boolean; code?: string; expiresAt?: string; error?: string }> {
   const s = await requireStaff();
-  if (!z.uuid().safeParse(gatewayId).success) return { ok: false, error: 'invalid gateway' };
+  if (!z.guid().safeParse(gatewayId).success) return { ok: false, error: 'invalid gateway' };
   const db = await createClient();
   const { data: gw } = await db.from('devices').select('id, kind, property_id').eq('id', gatewayId).single();
   if (!gw || gw.kind !== 'gateway') return { ok: false, error: 'Not a gateway' };
@@ -112,7 +112,7 @@ export async function createEnrollmentCodeAction(gatewayId: string): Promise<{ o
 
 export async function revokeGatewayTokensAction(fd: FormData) {
   await requireStaff();
-  const id = z.uuid().parse(fd.get('id'));
+  const id = z.guid().parse(fd.get('id'));
   const db = await createClient();
   await db.from('device_credentials').update({ revoked_at: new Date().toISOString() }).eq('device_id', id).is('revoked_at', null);
   revalidatePath(`/admin/devices/${id}`);
@@ -120,7 +120,7 @@ export async function revokeGatewayTokensAction(fd: FormData) {
 
 export async function queueOtaAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
   const s = await requireStaff();
-  const p = parseForm(z.object({ device_id: z.uuid(), release_id: z.uuid() }), fd);
+  const p = parseForm(z.object({ device_id: z.guid(), release_id: z.guid() }), fd);
   if (!p.ok) return p.result;
   const db = await createClient();
   const [{ data: dev }, { data: rel }] = await Promise.all([
@@ -146,7 +146,7 @@ export async function queueOtaAction(_: ActionResult, fd: FormData): Promise<Act
 
 export async function queueProbeAction(fd: FormData) {
   const s = await requireStaff();
-  const id = z.uuid().parse(fd.get('id'));
+  const id = z.guid().parse(fd.get('id'));
   const db = await createClient();
   const { data: dev } = await db.from('devices').select('id, gateway_id, property_id').eq('id', id).single();
   if (dev?.gateway_id) {
@@ -157,8 +157,8 @@ export async function queueProbeAction(fd: FormData) {
 
 export async function cancelCommandAction(fd: FormData) {
   await requireStaff();
-  const id = z.uuid().parse(fd.get('id'));
-  const deviceId = z.uuid().parse(fd.get('device_id'));
+  const id = z.guid().parse(fd.get('id'));
+  const deviceId = z.guid().parse(fd.get('device_id'));
   const db = await createClient();
   await db.from('device_commands').update({ status: 'cancelled', completed_at: new Date().toISOString() }).eq('id', id).eq('status', 'queued');
   revalidatePath(`/admin/devices/${deviceId}`);

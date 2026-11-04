@@ -11,7 +11,7 @@ const ROOM_TYPES = ['living', 'bedroom', 'kitchen', 'bathroom', 'hallway', 'entr
 const path = (id: string) => `/admin/properties/${id}`;
 
 const PropertyForm = z.object({
-  id: z.uuid(), name: reqStr(200), address_line1: optStr(200), address_line2: optStr(200), city: optStr(100), region: optStr(100),
+  id: z.guid(), name: reqStr(200), address_line1: optStr(200), address_line2: optStr(200), city: optStr(100), region: optStr(100),
   postal_code: optStr(20), country: optStr(60), timezone: z.string().min(1).max(64),
   exit_delay_s: z.coerce.number().int().min(0).max(600), status: z.enum(['planned', 'installing', 'active', 'suspended', 'archived']),
   wellness_vitals: z.string().optional(), access_notes: optStr(2000), notes: optStr(5000),
@@ -36,7 +36,7 @@ export async function updatePropertyAction(_: ActionResult, fd: FormData): Promi
 
 export async function createFloorAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
   await requireStaff();
-  const p = parseForm(z.object({ property_id: z.uuid(), name: reqStr(60), level: z.coerce.number().int().min(-5).max(100) }), fd);
+  const p = parseForm(z.object({ property_id: z.guid(), name: reqStr(60), level: z.coerce.number().int().min(-5).max(100) }), fd);
   if (!p.ok) return p.result;
   const db = await createClient();
   const { error } = await db.from('floors').insert({ ...p.data, sort_order: p.data.level });
@@ -47,8 +47,8 @@ export async function createFloorAction(_: ActionResult, fd: FormData): Promise<
 
 export async function deleteFloorAction(fd: FormData) {
   await requireStaff();
-  const id = z.uuid().parse(fd.get('id'));
-  const pid = z.uuid().parse(fd.get('property_id'));
+  const id = z.guid().parse(fd.get('id'));
+  const pid = z.guid().parse(fd.get('property_id'));
   const db = await createClient();
   const { data: f } = await db.from('floors').select('plan_path').eq('id', id).single();
   await db.from('floors').delete().eq('id', id);
@@ -58,7 +58,7 @@ export async function deleteFloorAction(fd: FormData) {
 
 export async function setFloorPlanAction(floorId: string, planPath: string, width: number, height: number): Promise<{ ok: boolean; error?: string }> {
   await requireStaff();
-  const a = z.object({ floorId: z.uuid(), planPath: z.string().regex(/^[0-9a-f-]{36}\/[0-9a-f-]{36}\/[0-9a-f-]{36}-\d+\.(png|jpeg|webp|svg)$/), width: z.number().int().positive().max(20000), height: z.number().int().positive().max(20000) })
+  const a = z.object({ floorId: z.guid(), planPath: z.string().regex(/^[0-9a-f-]{36}\/[0-9a-f-]{36}\/[0-9a-f-]{36}-\d+\.(png|jpeg|webp|svg)$/), width: z.number().int().positive().max(20000), height: z.number().int().positive().max(20000) })
     .safeParse({ floorId, planPath, width, height });
   if (!a.success) return { ok: false, error: 'Invalid floor plan' };
   const db = await createClient();
@@ -71,7 +71,7 @@ export async function setFloorPlanAction(floorId: string, planPath: string, widt
   return { ok: true };
 }
 
-const RoomForm = z.object({ property_id: z.uuid(), floor_id: z.union([z.literal(''), z.uuid()]).transform((v) => v || null), name: reqStr(120), room_type: z.enum(ROOM_TYPES) });
+const RoomForm = z.object({ property_id: z.guid(), floor_id: z.union([z.literal(''), z.guid()]).transform((v) => v || null), name: reqStr(120), room_type: z.enum(ROOM_TYPES) });
 export async function createRoomAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
   await requireStaff();
   const p = parseForm(RoomForm, fd);
@@ -85,8 +85,8 @@ export async function createRoomAction(_: ActionResult, fd: FormData): Promise<A
 
 export async function updateRoomAction(fd: FormData) {
   await requireStaff();
-  const p = z.object({ id: z.uuid(), property_id: z.uuid(), name: reqStr(120), room_type: z.enum(ROOM_TYPES),
-    floor_id: z.union([z.literal(''), z.uuid()]).transform((v) => v || null), monitoring_enabled: z.string().optional() }).parse(Object.fromEntries(fd));
+  const p = z.object({ id: z.guid(), property_id: z.guid(), name: reqStr(120), room_type: z.enum(ROOM_TYPES),
+    floor_id: z.union([z.literal(''), z.guid()]).transform((v) => v || null), monitoring_enabled: z.string().optional() }).parse(Object.fromEntries(fd));
   const db = await createClient();
   await db.from('rooms').update({ name: p.name, room_type: p.room_type, floor_id: p.floor_id, monitoring_enabled: p.monitoring_enabled === 'on' }).eq('id', p.id);
   revalidatePath(path(p.property_id));
@@ -94,8 +94,8 @@ export async function updateRoomAction(fd: FormData) {
 
 export async function deleteRoomAction(fd: FormData) {
   await requireStaff();
-  const id = z.uuid().parse(fd.get('id'));
-  const pid = z.uuid().parse(fd.get('property_id'));
+  const id = z.guid().parse(fd.get('id'));
+  const pid = z.guid().parse(fd.get('property_id'));
   const db = await createClient();
   await db.from('rooms').delete().eq('id', id);
   revalidatePath(path(pid));
@@ -104,7 +104,7 @@ export async function deleteRoomAction(fd: FormData) {
 export async function saveRoomShapeAction(roomId: string, shape: [number, number][] | null): Promise<{ ok: boolean; error?: string }> {
   await requireStaff();
   const s = z.array(z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)])).min(3).max(64).nullable().safeParse(shape);
-  if (!s.success || !z.uuid().safeParse(roomId).success) return { ok: false, error: 'Invalid outline' };
+  if (!s.success || !z.guid().safeParse(roomId).success) return { ok: false, error: 'Invalid outline' };
   const db = await createClient();
   const { data, error } = await db.from('rooms').update({ shape: s.data }).eq('id', roomId).select('property_id').single();
   if (error) return { ok: false, error: error.message };
@@ -114,7 +114,7 @@ export async function saveRoomShapeAction(roomId: string, shape: [number, number
 
 export async function startInstallationAction(fd: FormData) {
   const s = await requireStaff();
-  const pid = z.uuid().parse(fd.get('property_id'));
+  const pid = z.guid().parse(fd.get('property_id'));
   const db = await createClient();
   const { data: existing } = await db.from('installations').select('id').eq('property_id', pid).in('status', ['draft', 'in_progress']).maybeSingle();
   if (existing) redirect(`/admin/installations/${existing.id}`);

@@ -39,7 +39,7 @@ export async function createClientAction(_: ActionResult, fd: FormData): Promise
 
 export async function updateClientAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
   await requireAdmin();
-  const id = z.uuid().parse(fd.get('id'));
+  const id = z.guid().parse(fd.get('id'));
   const p = parseForm(ClientForm, fd);
   if (!p.ok) return p.result;
   const db = await createClient();
@@ -50,7 +50,7 @@ export async function updateClientAction(_: ActionResult, fd: FormData): Promise
 }
 
 const ContactForm = z.object({
-  client_id: z.uuid(), name: reqStr(120), relationship: optStr(60), email: optEmail, phone: optStr(40),
+  client_id: z.guid(), name: reqStr(120), relationship: optStr(60), email: optEmail, phone: optStr(40),
   kind: z.enum(['primary', 'emergency', 'billing', 'technical', 'other']), notes: optStr(1000),
 });
 export async function addContactAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
@@ -65,14 +65,14 @@ export async function addContactAction(_: ActionResult, fd: FormData): Promise<A
 }
 export async function deleteContactAction(fd: FormData) {
   await requireStaff();
-  const id = z.uuid().parse(fd.get('id'));
-  const clientId = z.uuid().parse(fd.get('client_id'));
+  const id = z.guid().parse(fd.get('id'));
+  const clientId = z.guid().parse(fd.get('client_id'));
   const db = await createClient();
   await db.from('client_contacts').delete().eq('id', id);
   revalidatePath(`/admin/clients/${clientId}`);
 }
 
-const InviteForm = z.object({ client_id: z.uuid(), email: z.email().max(254), full_name: optStr(120), role: z.enum(['owner', 'member', 'viewer']) });
+const InviteForm = z.object({ client_id: z.guid(), email: z.email().max(254), full_name: optStr(120), role: z.enum(['owner', 'member', 'viewer']) });
 
 /**
  * Invite a household user. Uses Supabase Auth invite email; if the person already
@@ -114,8 +114,8 @@ export async function inviteClientUserAction(_: ActionResult, fd: FormData): Pro
 
 export async function updateMemberRoleAction(fd: FormData) {
   await requireAdmin();
-  const clientId = z.uuid().parse(fd.get('client_id'));
-  const userId = z.uuid().parse(fd.get('user_id'));
+  const clientId = z.guid().parse(fd.get('client_id'));
+  const userId = z.guid().parse(fd.get('user_id'));
   const role = z.enum(['owner', 'member', 'viewer', 'remove']).parse(fd.get('role'));
   const db = await createClient();
   if (role === 'remove') await db.from('client_members').delete().eq('client_id', clientId).eq('user_id', userId);
@@ -124,7 +124,7 @@ export async function updateMemberRoleAction(fd: FormData) {
 }
 
 const PropertyForm = z.object({
-  client_id: z.uuid(), name: reqStr(200), address_line1: optStr(200), address_line2: optStr(200), city: optStr(100),
+  client_id: z.guid(), name: reqStr(200), address_line1: optStr(200), address_line2: optStr(200), city: optStr(100),
   region: optStr(100), postal_code: optStr(20), country: optStr(60), timezone: z.string().min(1).max(64),
   exit_delay_s: z.coerce.number().int().min(0).max(600).default(60), access_notes: optStr(2000),
 });

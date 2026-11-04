@@ -16,7 +16,9 @@
     "test:db": "bash supabase/tests/run-local.sh",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint -w @ruview/web",
-    "build": "npm run build -w @ruview/gateway-agent && node scripts/publish-gateway-kit.mjs && npm run build -w @ruview/web"
+    "build": "npm run build -w @ruview/gateway-agent && node scripts/publish-gateway-kit.mjs && npm run build -w @ruview/web",
+    "test:e2e": "bash supabase/tests/e2e.sh",
+    "test:all": "npm test && npm run test:db && npm run test:e2e"
   },
   "devDependencies": {
     "@types/node": "22.20.5",

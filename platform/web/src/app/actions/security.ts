@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { requireSession } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 
-const Args = z.object({ propertyId: z.uuid(), mode: z.enum(['disarmed', 'armed_home', 'armed_away']) });
+const Args = z.object({ propertyId: z.guid(), mode: z.enum(['disarmed', 'armed_home', 'armed_away']) });
 
 /** Arm/disarm. Authorisation is re-checked inside the set_security_mode RPC (staff or owner/member). */
 export async function setSecurityMode(propertyId: string, mode: string): Promise<{ ok: boolean; error?: string; mode?: string; changedAt?: string }> {

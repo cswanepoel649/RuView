@@ -11,7 +11,7 @@ const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 export async function savePreferencesAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
   const s = await requireClientUser();
   const p = parseForm(z.object({
-    client_id: z.uuid(), email_enabled: z.string().optional(), min_severity: z.enum(['info', 'warning', 'critical']),
+    client_id: z.guid(), email_enabled: z.string().optional(), min_severity: z.enum(['info', 'warning', 'critical']),
     quiet_start: z.union([z.literal(''), hhmm]).optional(), quiet_end: z.union([z.literal(''), hhmm]).optional(),
     muted: z.array(z.string().regex(/^[a-z_]+$/)).default([]),
   }), fd);
@@ -30,7 +30,7 @@ export async function savePreferencesAction(_: ActionResult, fd: FormData): Prom
 export async function addRuleAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
   await requireClientUser();
   const p = parseForm(z.object({
-    client_id: z.uuid(), property_id: z.uuid(), event_type: z.string().regex(/^[a-z_]+$/),
+    client_id: z.guid(), property_id: z.guid(), event_type: z.string().regex(/^[a-z_]+$/),
     target: z.string().regex(/^(all|room:[0-9a-f-]{36}|zone:[0-9a-f-]{36})$/),
     start: z.union([z.literal(''), hhmm]).optional(), end: z.union([z.literal(''), hhmm]).optional(),
     email: z.string().optional(),
@@ -52,7 +52,7 @@ export async function addRuleAction(_: ActionResult, fd: FormData): Promise<Acti
 
 export async function toggleRuleAction(fd: FormData) {
   await requireClientUser();
-  const id = z.uuid().parse(fd.get('id'));
+  const id = z.guid().parse(fd.get('id'));
   const op = z.enum(['enable', 'disable', 'delete']).parse(fd.get('op'));
   const db = await createClient();
   if (op === 'delete') await db.from('alert_rules').delete().eq('id', id);

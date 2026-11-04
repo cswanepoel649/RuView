@@ -8,11 +8,11 @@ import type { ActionResult } from '@/components/ui/forms';
 
 // Shared by admin and client portals. RLS permits staff and client owners/members.
 const ZoneForm = z.object({
-  id: z.union([z.literal(''), z.uuid()]).optional(),
-  property_id: z.uuid(), name: reqStr(120), description: optStr(500),
+  id: z.union([z.literal(''), z.guid()]).optional(),
+  property_id: z.guid(), name: reqStr(120), description: optStr(500),
   active_modes: z.array(z.enum(['armed_home', 'armed_away'])).min(1, 'choose at least one mode'),
   entry_delay_s: z.coerce.number().int().min(0).max(300), enabled: z.string().optional(),
-  rooms: z.array(z.uuid()).default([]),
+  rooms: z.array(z.guid()).default([]),
 });
 
 function revalidate(pid: string) {
@@ -49,8 +49,8 @@ export async function saveZoneAction(_: ActionResult, fd: FormData): Promise<Act
 
 export async function deleteZoneAction(fd: FormData) {
   await requireSession();
-  const id = z.uuid().parse(fd.get('id'));
-  const pid = z.uuid().parse(fd.get('property_id'));
+  const id = z.guid().parse(fd.get('id'));
+  const pid = z.guid().parse(fd.get('property_id'));
   const db = await createClient();
   await db.from('security_zones').delete().eq('id', id);
   revalidate(pid);

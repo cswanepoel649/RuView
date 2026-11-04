@@ -9,9 +9,9 @@ import type { ActionResult } from '@/components/ui/forms';
 
 // Shared by both portals. A DB trigger sanitises client-supplied fields (status, priority, assignee).
 const NewTicket = z.object({
-  client_id: z.uuid(),
-  property_id: z.union([z.literal(''), z.uuid()]).transform((v) => v || null),
-  device_id: z.union([z.literal(''), z.uuid()]).transform((v) => v || null),
+  client_id: z.guid(),
+  property_id: z.union([z.literal(''), z.guid()]).transform((v) => v || null),
+  device_id: z.union([z.literal(''), z.guid()]).transform((v) => v || null),
   category: z.enum(['device', 'alert', 'installation', 'account', 'other']),
   priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
   subject: z.string().min(3).max(200), description: z.string().min(1).max(10000),
@@ -28,7 +28,7 @@ export async function createTicketAction(_: ActionResult, fd: FormData): Promise
 
 export async function replyTicketAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
   const s = await requireSession();
-  const p = parseForm(z.object({ ticket_id: z.uuid(), body: z.string().min(1).max(10000), internal: z.string().optional(), status: z.string().optional() }), fd);
+  const p = parseForm(z.object({ ticket_id: z.guid(), body: z.string().min(1).max(10000), internal: z.string().optional(), status: z.string().optional() }), fd);
   if (!p.ok) return p.result;
   const db = await createClient();
   const { error } = await db.from('ticket_messages').insert({ ticket_id: p.data.ticket_id, body: p.data.body, internal: s.isStaff && p.data.internal === 'on', author_id: s.userId });
@@ -45,10 +45,10 @@ export async function replyTicketAction(_: ActionResult, fd: FormData): Promise<
 export async function updateTicketAction(fd: FormData) {
   const s = await requireSession();
   if (!s.isStaff) return;
-  const id = z.uuid().parse(fd.get('id'));
+  const id = z.guid().parse(fd.get('id'));
   const status = z.enum(['open', 'in_progress', 'waiting_client', 'resolved', 'closed']).parse(fd.get('status'));
   const priority = z.enum(['low', 'normal', 'high', 'urgent']).parse(fd.get('priority'));
-  const assigned_to = z.union([z.literal(''), z.uuid()]).transform((v) => v || null).parse(fd.get('assigned_to') ?? '');
+  const assigned_to = z.union([z.literal(''), z.guid()]).transform((v) => v || null).parse(fd.get('assigned_to') ?? '');
   const db = await createClient();
   await db.from('support_tickets').update({ status, priority, assigned_to }).eq('id', id);
   revalidatePath(`/admin/tickets/${id}`);
