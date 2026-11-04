@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`platform/` — multi-tenant home monitoring platform on top of RuView** — Next.js 16 + Supabase
+  (Auth, Postgres RLS, Storage, Realtime). Operations console (clients, properties, floor plans and room
+  outlines, security zones, device inventory, firmware releases, guided installation wizard, alerts,
+  support, team, audit) and per-client portal (live occupancy floor plan, arm/disarm, room history and
+  insights, alert rules and notification preferences, support). Browser-based ESP32-S3 provisioning via
+  Web Serial/esptool-js with an NVS generator byte-identical to ESP-IDF `nvs_partition_gen`.
+  `ruview-agent` home gateway bridge (UDP tap + relay to the unmodified sensing-server, edge/server signal
+  merge, outbox, OTA executor). 129 SQL assertions, unit and end-to-end tests. See
+  `platform/docs/ARCHITECTURE.md` for the RuView capability audit and integration findings (CSI header
+  offset bug in the sensing-server, 0xC5110004 magic collision, 900 KB OTA limit vs 990 KB image,
+  simulated-data fallback in `--source auto`).
 - **`nvsim` crate — deterministic NV-diamond magnetometer pipeline simulator** (ADR-089) —
   New standalone leaf crate at `v2/crates/nvsim` modeling a forward-only
   magnetic sensing path: scene → source synthesis (Biot–Savart, dipole,

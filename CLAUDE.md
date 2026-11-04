@@ -217,6 +217,7 @@ Active feature branch: `ruvsense-full-implementation` (PR #77)
 - `v2/crates/wifi-densepose-ruvector/src/viewpoint/` — Cross-viewpoint fusion (5 files)
 - `v2/crates/wifi-densepose-hardware/src/esp32/` — ESP32 TDM protocol
 - `firmware/esp32-csi-node/main/` — ESP32 C firmware (channel hopping, NVS config, TDM)
+- `platform/` — Multi-tenant monitoring platform (Next.js `web/`, `gateway-agent/`, `shared/`, Supabase `supabase/`); test with `cd platform && npm test && npm run test:db && npm run test:e2e`
 - `archive/v1/src/` — Python source (core, hardware, services, api)
 - `archive/v1/data/proof/` — Deterministic CSI proof bundles
 - `.claude-flow/` — Claude Flow coordination state (committed for team sharing)

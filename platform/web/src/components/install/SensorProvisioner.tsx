@@ -6,7 +6,7 @@
  *   → flash firmware + NVS (or NVS only) → reset → verify boot log → confirm.
  * Fallback for browsers without Web Serial: download the NVS image and run esptool.
  */
-import { useRef, useState } from 'react';
+import { useRef, useState, useSyncExternalStore } from 'react';
 import { CheckCircle2, CircleX, Download, Loader2, Usb } from 'lucide-react';
 import { buildProvisioningNvs, NVS_PARTITION_OFFSET, type NodeProvisioningConfig } from '@ruview/shared/nvs';
 import { FLASH_LAYOUT } from '@ruview/shared/catalog';
@@ -48,6 +48,7 @@ export function SensorProvisioner(props: Props) {
   const [releaseId, setReleaseId] = useState('');
   const [advanced, setAdvanced] = useState({ edgeTier: 2 as 0 | 1 | 2, channel: '' });
   const [manualMac, setManualMac] = useState('');
+  const serialOk = useSyncExternalStore(() => () => {}, webSerialSupported, () => false);
   const session = useRef<BoardSession | null>(null);
   const prepared = useRef<{ res: Extract<PrepareResult, { ok: true }>; cfg: NodeProvisioningConfig; release: Release | null } | null>(null);
 
@@ -165,14 +166,22 @@ export function SensorProvisioner(props: Props) {
         </div>
         {props.gateways.length === 0 && <Notice tone="warn">Set up the gateway (previous step) before provisioning sensors.</Notice>}
 
-        {!webSerialSupported() ? (
+        {!serialOk ? (
           <Notice tone="warn" title="This browser cannot access USB serial ports">
             Use Chrome or Edge on a desktop/laptop for one-click flashing. Alternatively, enter the board MAC (printed by <code>esptool read_mac</code>) to download its configuration image and flash it with esptool:
             <div className="mt-2 flex flex-wrap items-end gap-2">
               <Input value={manualMac} onChange={(e) => setManualMac(e.target.value)} placeholder="aa:bb:cc:dd:ee:ff" className="max-w-[200px]" />
               <Select value={roomId} onChange={(e) => setRoomId(e.target.value)} className="max-w-[180px]">{props.rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</Select>
-              <Button variant="secondary" disabled={!ready || !/^[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}$/.test(manualMac)} onClick={manualBundle}><Download className="h-4 w-4" />Download NVS image</Button>
+              <Button variant="secondary" disabled={!ready || phase === 'monitor' || !/^[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}$/.test(manualMac)} onClick={manualBundle}><Download className="h-4 w-4" />Download NVS image</Button>
             </div>
+            {phase === 'monitor' && (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <span>After flashing, check the serial log for “Got IP” and “CSI streaming active”, then save.</span>
+                <span className="flex gap-2"><Button variant="ghost" onClick={reset}>Discard</Button><Button onClick={confirm}>Save provisioned board</Button></span>
+              </div>
+            )}
+            {phase === 'done' && <p className="mt-3 text-ok">Saved. The node appears online once the gateway receives its packets.</p>}
+            {phase === 'error' && <p className="mt-3 text-bad">{error}</p>}
           </Notice>
         ) : (
           <div className="rounded-xl border border-border p-4">

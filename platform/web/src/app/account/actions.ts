@@ -20,7 +20,7 @@ export async function updateProfileAction(_: ActionResult, fd: FormData): Promis
 export async function changePasswordAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
   await requireSession();
   const pw = String(fd.get('password') ?? '');
-  if (pw.length < 12) return { error: 'Use at least 12 characters.' };
+  if (pw.length < 12 || !/[a-z]/.test(pw) || !/[A-Z]/.test(pw) || !/\d/.test(pw)) return { error: 'Use at least 12 characters with upper- and lower-case letters and a digit.' };
   if (pw !== fd.get('confirm')) return { error: 'Passwords do not match.' };
   const db = await createClient();
   const { error } = await db.auth.updateUser({ password: pw });
