@@ -1,0 +1,135 @@
+# RuView Monitoring Platform — complete local / single-host stack.
+#
+#   docker compose up -d --build              # Supabase + migrations + web app + scheduler
+#   docker compose --profile gateway up -d    # also run a test home gateway (ESP32 UDP on :5005)
+#
+# Configuration comes from ./.env (generate it with generate-env.mjs; see README.md).
+# Requires Docker Compose v2.24+ (include with override files).
+name: ruview
+
+include:
+  - path:
+      - ./supabase/docker-compose.yml
+      - ./supabase.override.yml
+    env_file: ./.env
+
+services:
+  # One-shot: applies ../supabase/migrations in order and records them in
+  # supabase_migrations.schema_migrations (same table the Supabase CLI uses).
+  migrate:
+    image: supabase/postgres:17.6.1.136
+    restart: "no"
+    depends_on:
+      db: { condition: service_healthy }
+      auth: { condition: service_healthy }      # creates auth.users
+      storage: { condition: service_healthy }   # creates storage.buckets / storage.objects
+      realtime: { condition: service_healthy }
+    entrypoint: ["bash", "/scripts/migrate.sh"]
+    environment:
+      PGHOST: ${POSTGRES_HOST}
+      PGPORT: ${POSTGRES_PORT}
+      PGDATABASE: ${POSTGRES_DB}
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ../supabase/migrations:/migrations:ro
+      - ./migrate.sh:/scripts/migrate.sh:ro
+
+  web:
+    image: ruview-platform:local
+    build:
+      context: ..
+      dockerfile: docker/web.Dockerfile
+      args:
+        # Inlined into the browser bundle and the CSP at build time.
+        NEXT_PUBLIC_SUPABASE_URL: ${SUPABASE_PUBLIC_URL}
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${ANON_KEY}
+    restart: unless-stopped
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      api-gw: { condition: service_healthy }
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: ${SUPABASE_PUBLIC_URL}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${ANON_KEY}
+      # Server-side calls go through the gateway on the compose network.
+      SUPABASE_INTERNAL_URL: http://api-gw:8000
+      SUPABASE_SECRET_KEY: ${SERVICE_ROLE_KEY}
+      APP_URL: ${APP_URL}
+      DEVICE_SECRET_KEY: ${DEVICE_SECRET_KEY}
+      CRON_SECRET: ${CRON_SECRET}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+    ports:
+      - ${WEB_PORT:-3000}:3000
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  # Calls the cron endpoints (email delivery every minute; maintenance every 5 min —
+  # pg_cron also runs maintenance every minute inside the database).
+  scheduler:
+    image: ruview-platform:local
+    pull_policy: never
+    restart: unless-stopped
+    depends_on:
+      web: { condition: service_healthy }
+    command: ["node", "/app/docker/scheduler.mjs"]
+    environment:
+      APP_INTERNAL_URL: http://web:3000
+      CRON_SECRET: ${CRON_SECRET}
+
+  # ---------------------------------------------------------------- gateway (optional)
+  # A home gateway on this machine for trying the platform with real ESP32 boards.
+  # Production gateways run the kit from the web app's /install/gateway.sh with host
+  # networking on Linux (Docker Desktop NATs UDP, hiding node IPs, so OTA/MAC checks
+  # need a Linux host).
+  sensing-server:
+    profiles: [gateway]
+    image: ${SENSING_IMAGE:-ruvnet/wifi-densepose:latest}
+    restart: unless-stopped
+    command: ["/app/sensing-server", "--source", "esp32", "--udp-port", "5006",
+              "--http-port", "8080", "--ws-port", "8765", "--bind-addr", "127.0.0.1",
+              "--ui-path", "/app/ui", "--tick-ms", "100"]
+    environment:
+      # HTTP/WS are bound to loopback (shared only with gateway-agent); required by the
+      # upstream image entrypoint's no-auth safety check (RuView issue #864).
+      RUVIEW_BIND_ADDR: 127.0.0.1
+    ports:
+      - 5005:5005/udp          # ESP32 nodes stream here (received by gateway-agent in this netns)
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+  gateway-agent:
+    profiles: [gateway]
+    image: ruview-platform:local
+    pull_policy: never
+    restart: unless-stopped
+    network_mode: service:sensing-server     # share localhost with the sensing-server
+    depends_on:
+      sensing-server: { condition: service_started }
+      web: { condition: service_healthy }
+    command: ["node", "/app/web/public/install/ruview-agent.mjs"]
+    environment:
+      RUVIEW_CLOUD_URL: http://web:3000
+      RUVIEW_ALLOW_INSECURE_HTTP: "1"         # compose-internal HTTP only
+      RUVIEW_ENROLLMENT_CODE: ${GATEWAY_ENROLLMENT_CODE:-}
+      RUVIEW_HW_ID: ${GATEWAY_HW_ID}
+      RUVIEW_STATE_DIR: /var/lib/ruview-agent
+      RUVIEW_UDP_LISTEN: 0.0.0.0:5005
+      RUVIEW_UDP_FORWARD: 127.0.0.1:5006
+      RUVIEW_SENSING_WS: ws://127.0.0.1:8765/ws/sensing
+      RUVIEW_SENSING_HTTP: http://127.0.0.1:8080
+      # Docker NATs the UDP traffic: the agent would see the bridge MAC/IP, not the boards'.
+      RUVIEW_ARP: "off"
+    volumes:
+      - gateway-state:/var/lib/ruview-agent
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+volumes:
+  gateway-state:

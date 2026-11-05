@@ -15,6 +15,8 @@ export interface AgentConfig {
   nodeOtaPort: number;
   /** Max minute buckets kept on disk while the cloud is unreachable (~7 days for 2 nodes). */
   outboxMaxMinutes: number;
+  /** Read /proc/net/arp to report node MACs. Off when the agent runs behind Docker NAT (it would see the bridge MAC). */
+  arpEnabled: boolean;
   agentVersion: string;
 }
 
@@ -66,6 +68,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AgentConfig {
     sensingHttpUrl: (env.RUVIEW_SENSING_HTTP || 'http://127.0.0.1:8080').replace(/\/+$/, ''),
     nodeOtaPort: Number(env.RUVIEW_NODE_OTA_PORT || 8032),
     outboxMaxMinutes: Number(env.RUVIEW_OUTBOX_MAX_MINUTES || 30000),
+    arpEnabled: (env.RUVIEW_ARP || 'on').toLowerCase() !== 'off',
     agentVersion: AGENT_VERSION,
   };
 }

@@ -2,6 +2,7 @@ import { HeartbeatRequest } from '@ruview/shared/protocol';
 import { otaSlotBytes } from '@ruview/shared/catalog';
 import { adminClient } from '@/lib/supabase/admin';
 import { decryptSecret } from '@/lib/crypto';
+import { toPublicSupabaseUrl } from '@/lib/public-env';
 import { authenticateGateway, clientIp, handle, json, pgError, readJson } from '@/lib/gateway-api';
 
 export const dynamic = 'force-dynamic';
@@ -45,6 +46,6 @@ async function enrich(c: RawCommand) {
   if (error || !signed) throw new Error('could not sign firmware URL');
   return {
     ...c,
-    payload: { release_id: rel.id, version: rel.version, url: signed.signedUrl, sha256: app.sha256, size: app.size, psk: decryptSecret(secret.ota_psk_ciphertext as string) },
+    payload: { release_id: rel.id, version: rel.version, url: toPublicSupabaseUrl(signed.signedUrl), sha256: app.sha256, size: app.size, psk: decryptSecret(secret.ota_psk_ciphertext as string) },
   };
 }

@@ -18,18 +18,27 @@ export function useLiveRooms(propertyId: string, initial: RoomState[]) {
   useEffect(() => {
     const sb = browserClient();
     const apply = (r: RoomState) => setRooms((prev) => ({ ...prev, [r.room_id]: r }));
-    const channel = sb
-      .channel(`rooms:${propertyId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'room_state', filter: `property_id=eq.${propertyId}` },
-        (p) => { if (p.new && 'room_id' in p.new) apply(p.new as RoomState); })
-      .subscribe((status) => setConnected(status === 'SUBSCRIBED'));
+    let channel: ReturnType<typeof sb.channel> | null = null;
+    let cancelled = false;
+    // Realtime evaluates RLS with the socket's JWT: set the user's token *before* joining,
+    // otherwise the channel joins as anon and every row is filtered out silently.
+    const { data: sub } = sb.auth.onAuthStateChange((_e, session) => { if (session) void sb.realtime.setAuth(session.access_token); });
+    void sb.auth.getSession().then(async ({ data }) => {
+      if (cancelled) return;
+      if (data.session) await sb.realtime.setAuth(data.session.access_token);
+      channel = sb
+        .channel(`rooms:${propertyId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'room_state', filter: `property_id=eq.${propertyId}` },
+          (p) => { if (p.new && 'room_id' in p.new) apply(p.new as RoomState); })
+        .subscribe((status) => setConnected(status === 'SUBSCRIBED'));
+    });
     const refetch = async () => {
       const { data } = await sb.from('room_state').select('*').eq('property_id', propertyId);
       if (data) setRooms(Object.fromEntries((data as RoomState[]).map((r) => [r.room_id, r])));
     };
     const poll = setInterval(refetch, 30_000);
     const tick = setInterval(() => setNow(Date.now()), 5_000);
-    return () => { clearInterval(poll); clearInterval(tick); void sb.removeChannel(channel); };
+    return () => { cancelled = true; clearInterval(poll); clearInterval(tick); sub.subscription.unsubscribe(); if (channel) void sb.removeChannel(channel); };
   }, [propertyId]);
 
   const isStale = (r?: RoomState) => !r || r.stale || !r.updated_at || now - Date.parse(r.updated_at) > STALE_AFTER_MS;

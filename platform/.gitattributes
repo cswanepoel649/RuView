@@ -1,0 +1,8 @@
+# Scripts and SQL run inside Linux containers: keep LF line endings on every OS.
+*.sh   text eol=lf
+*.sql  text eol=lf
+*.mjs  text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.exs  text eol=lf
+docker/.env* text eol=lf

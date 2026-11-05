@@ -15,14 +15,19 @@ function roomVisual(r: RoomState | undefined, stale: boolean) {
   return { fill: 'color-mix(in srgb, var(--ok) 10%, transparent)', stroke: 'color-mix(in srgb, var(--ok) 55%, transparent)', label: 'Clear', tone: 'ok' as const };
 }
 
-export function LiveFloorPlan({ propertyId, floors, rooms, initialStates, roomHref, title = 'Live view' }: {
-  propertyId: string; floors: FloorWithPlan[]; rooms: Room[]; initialStates: RoomState[]; roomHref?: (roomId: string) => string; title?: string;
+export function LiveFloorPlan({ propertyId, floors, rooms, initialStates, roomHrefBase, title = 'Live view' }: {
+  propertyId: string; floors: FloorWithPlan[]; rooms: Room[]; initialStates: RoomState[];
+  /** Rooms link to `${roomHrefBase}/${roomId}` (a string: functions cannot cross the server→client boundary). */
+  roomHrefBase?: string; title?: string;
 }) {
+  const roomHref = roomHrefBase ? (id: string) => `${roomHrefBase}/${id}` : undefined;
   const live = useLiveRooms(propertyId, initialStates);
   const [floorId, setFloorId] = useState<string | null>(floors[0]?.id ?? null);
   const floor = floors.find((f) => f.id === floorId) ?? null;
-  const floorRooms = useMemo(() => rooms.filter((r) => (floor ? r.floor_id === floor.id : true)), [rooms, floor]);
-  const mapped = floorRooms.filter((r) => r.shape && r.shape.length >= 3);
+  // Rooms without a floor are always listed, so no monitored room can be hidden by the floor filter.
+  const floorRooms = useMemo(() => rooms.filter((r) => (floor ? r.floor_id === floor.id || !r.floor_id : true)), [rooms, floor]);
+  const mappedOnFloor = (r: Room) => !floor || r.floor_id === floor.id;
+  const mapped = floorRooms.filter((r) => mappedOnFloor(r) && r.shape && r.shape.length >= 3);
   const aspect = floor?.plan_width && floor?.plan_height ? floor.plan_height / floor.plan_width : 0.62;
   const occupiedCount = rooms.filter((r) => live.rooms[r.id]?.occupied && !live.isStale(live.rooms[r.id])).length;
   const staleCount = rooms.filter((r) => r.monitoring_enabled && live.isStale(live.rooms[r.id])).length;
@@ -75,7 +80,7 @@ export function LiveFloorPlan({ propertyId, floors, rooms, initialStates, roomHr
           </div>
         </div>
       )}
-      <div className="grid gap-3 p-4 pt-0 sm:grid-cols-2 xl:grid-cols-3" style={mapped.length ? undefined : { paddingTop: 16 }}>
+      <div className="grid gap-3 p-4 pt-0 sm:grid-cols-2 2xl:grid-cols-3" style={mapped.length ? undefined : { paddingTop: 16 }}>
         {floorRooms.map((r) => {
           const st = live.rooms[r.id];
           const stale = live.isStale(st);
@@ -84,7 +89,7 @@ export function LiveFloorPlan({ propertyId, floors, rooms, initialStates, roomHr
             <div className={cn('rounded-lg border p-3 transition', st?.occupied && !stale ? 'border-occupied/60 bg-occupied-soft' : 'border-border bg-surface')}>
               <div className="flex items-center justify-between gap-2">
                 <p className="truncate font-medium">{r.name}</p>
-                {!r.monitoring_enabled ? <Badge>Not monitored</Badge> : stale ? <Badge><WifiOff className="h-3 w-3" />No data</Badge> : <Badge tone={v.tone}>{v.label}</Badge>}
+                {!r.monitoring_enabled ? <Badge className="shrink-0 whitespace-nowrap">Not monitored</Badge> : stale ? <Badge className="shrink-0 whitespace-nowrap"><WifiOff className="h-3 w-3" />No data</Badge> : <Badge tone={v.tone} className="shrink-0 whitespace-nowrap">{v.label}</Badge>}
               </div>
               <div className="mt-2 flex items-center gap-4 text-xs text-muted">
                 {!stale && st?.occupied && <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />~{st.person_count} {st.person_count === 1 ? 'person' : 'people'}</span>}

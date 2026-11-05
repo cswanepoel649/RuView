@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import type { EmailOtpType } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
+import { appUrl } from '@/lib/app-url';
 
 /**
  * Email link verification (invite, recovery, magic link). Configure the Supabase
@@ -15,8 +16,8 @@ export async function GET(req: NextRequest) {
     const { error } = await supabase.auth.verifyOtp({ token_hash, type });
     if (!error) {
       const dest = type === 'invite' || type === 'recovery' ? '/update-password' : '/';
-      return NextResponse.redirect(new URL(dest, req.url));
+      return NextResponse.redirect(appUrl(dest));
     }
   }
-  return NextResponse.redirect(new URL('/login?error=link', req.url));
+  return NextResponse.redirect(appUrl('/login?error=link'));
 }

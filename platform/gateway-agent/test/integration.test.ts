@@ -130,7 +130,7 @@ beforeAll(async () => {
     RUVIEW_SENSING_HTTP: `http://127.0.0.1:${ports.sensing}`,
     RUVIEW_NODE_OTA_PORT: String(ports.ota),
   });
-  agent = new Agent(cfg, { arp: () => new Map([['127.0.0.1', 'aa:bb:cc:00:00:01']]), otaPollMs: 50, otaRebootWaitMs: 3000 });
+  agent = new Agent(cfg, { arp: () => new Map([['127.0.0.1', 'aa:bb:cc:00:00:01']]), otaPollMs: 50, otaRebootWaitMs: 3000, sensingGraceMs: 2000 });
   await agent.start();
   await until(() => wsSockets.length > 0);
 });

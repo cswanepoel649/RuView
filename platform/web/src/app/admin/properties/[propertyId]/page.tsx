@@ -120,7 +120,7 @@ export default async function AdminProperty({ params, searchParams }: { params: 
                         <input type="hidden" name="id" value={r.id} /><input type="hidden" name="property_id" value={p.id} />
                         <Input name="name" defaultValue={r.name} required />
                         <Select name="room_type" defaultValue={r.room_type}>{ROOM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</Select>
-                        <Select name="floor_id" defaultValue={r.floor_id ?? ''}><option value="">—</option>{floors.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</Select>
+                        <Select key={floors.map((f) => f.id).join()} name="floor_id" defaultValue={r.floor_id ?? ''}><option value="">—</option>{floors.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</Select>
                         <Checkbox name="monitoring_enabled" label="" defaultChecked={r.monitoring_enabled} aria-label="Monitoring enabled" />
                         <Button variant="secondary" type="submit" className="py-1.5">Save</Button>
                       </form>
@@ -135,7 +135,7 @@ export default async function AdminProperty({ params, searchParams }: { params: 
                 <input type="hidden" name="property_id" value={p.id} />
                 <Field label="Room name"><Input name="name" required placeholder="Living room" /></Field>
                 <Field label="Type"><Select name="room_type" defaultValue="living">{ROOM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</Select></Field>
-                <Field label="Floor"><Select name="floor_id" defaultValue={floors[0]?.id ?? ''}><option value="">—</option>{floors.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</Select></Field>
+                <Field label="Floor"><Select key={floors.map((f) => f.id).join()} name="floor_id" defaultValue={floors[0]?.id ?? ''}><option value="">—</option>{floors.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</Select></Field>
                 <SubmitButton>Add room</SubmitButton>
               </ActionForm>
             </CardBody>

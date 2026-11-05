@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { appUrl } from '@/lib/app-url';
 
 /** OAuth/PKCE code exchange (magic links & invites using the PKCE flow). */
 export async function GET(req: NextRequest) {
@@ -9,7 +10,7 @@ export async function GET(req: NextRequest) {
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) return NextResponse.redirect(new URL(dest, req.url));
+    if (!error) return NextResponse.redirect(appUrl(dest));
   }
-  return NextResponse.redirect(new URL('/login?error=link', req.url));
+  return NextResponse.redirect(appUrl('/login?error=link'));
 }

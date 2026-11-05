@@ -69,6 +69,23 @@ describe('merge', () => {
   });
 });
 
+describe('SensingClient start-up grace', () => {
+  it('waits for a late sensing-server and gives up after the bound', async () => {
+    const http = await import('node:http');
+    let up = false;
+    const srv = http.createServer((_, res) => { if (!up) { res.destroy(); return; } res.end('{"status":"ok","source":"esp32","tick":1}'); });
+    await new Promise<void>((r) => srv.listen(0, '127.0.0.1', () => r()));
+    const port = (srv.address() as { port: number }).port;
+    const s = new SensingClient('ws://127.0.0.1:1/ws', `http://127.0.0.1:${port}`);
+    setTimeout(() => { up = true; }, 150);
+    expect(await s.waitUntilReachable(3000, 50)).toBe(true);
+    expect(s.health.source).toBe('esp32');
+    const dead = new SensingClient('ws://127.0.0.1:1/ws', 'http://127.0.0.1:1');
+    expect(await dead.waitUntilReachable(120, 40)).toBe(false);
+    srv.close();
+  });
+});
+
 describe('MinuteAggregator', () => {
   it('closes buckets on rollover and when stale', () => {
     const a = new MinuteAggregator();
@@ -96,6 +113,7 @@ describe('host + config', () => {
     expect(() => loadConfig({})).toThrow(/RUVIEW_CLOUD_URL/);
     expect(() => loadConfig({ RUVIEW_CLOUD_URL: 'http://monitor.example.com' })).toThrow(/https/);
     expect(loadConfig({ RUVIEW_CLOUD_URL: 'http://localhost:3000' }).cloudUrl).toBe('http://localhost:3000');
+    expect(loadConfig({ RUVIEW_CLOUD_URL: 'https://x.test', RUVIEW_ARP: 'off' }).arpEnabled).toBe(false);
     expect(() => loadConfig({ RUVIEW_CLOUD_URL: 'https://x.test', RUVIEW_UDP_FORWARD: '127.0.0.1:5005' })).toThrow(/differ/);
   });
 });

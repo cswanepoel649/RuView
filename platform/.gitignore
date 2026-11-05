@@ -12,3 +12,7 @@ playwright-report/
 test-results/
 gateway-agent/state/
 web/public/install/
+docker/.env
+docker/supabase/volumes/db/data/
+docker/supabase/volumes/storage/
+docker/supabase/volumes/snippets/

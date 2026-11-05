@@ -13,6 +13,8 @@ services:
               "--ui-path", "/app/ui", "--tick-ms", "100"]
     environment:
       RUST_LOG: info
+      # HTTP/WS bound to loopback; required by the image entrypoint's no-auth check (RuView #864).
+      RUVIEW_BIND_ADDR: 127.0.0.1
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }

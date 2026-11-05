@@ -1,0 +1,10 @@
+**/node_modules
+**/.next
+**/dist
+web/public/install
+docker/.env
+docker/supabase/volumes/db/data
+docker/supabase/volumes/storage
+docker/supabase/volumes/snippets
+supabase/.temp
+.git

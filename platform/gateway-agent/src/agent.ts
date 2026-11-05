@@ -16,6 +16,7 @@ export interface AgentDeps {
   now?: () => number;
   otaPollMs?: number;
   otaRebootWaitMs?: number;
+  sensingGraceMs?: number;
 }
 
 export class Agent {
@@ -56,6 +57,9 @@ export class Agent {
     await this.ensureEnrolled();
     await this.tap.start();
     this.sensing.start();
+    // The sensing-server may still be starting (e.g. both containers launched together):
+    // give it a bounded grace period so the first heartbeat does not raise sensing_degraded.
+    await this.sensing.waitUntilReachable(this.deps.sensingGraceMs ?? 20_000);
     await this.heartbeat();
     this.schedule(() => this.heartbeat(), () => this.config.heartbeat_interval_s * 1000);
     this.schedule(() => this.telemetryTick(), () => this.config.telemetry_interval_s * 1000);
@@ -116,7 +120,7 @@ export class Agent {
   }
 
   buildHeartbeat(): HeartbeatRequest {
-    const arp = (this.deps.arp ?? readArp)();
+    const arp = this.cfg.arpEnabled ? (this.deps.arp ?? readArp)() : new Map<string, string>();
     const now = (this.deps.now ?? Date.now)();
     return {
       protocol: 1,

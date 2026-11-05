@@ -8,6 +8,10 @@ per monitored property. ESP32 nodes are flashed in the browser during installati
 
 ## 0. Local development (laptop)
 
+> **Simplest option:** `platform/docker/` runs the whole stack (self-hosted Supabase, migrations, web app,
+> scheduler, mail catcher, optional test gateway) with one `docker compose up -d --build` — see
+> `docker/README.md`. The steps below use the Supabase CLI instead.
+
 Prerequisites: Node 20+, Docker Desktop (for the local Supabase stack), `openssl`.
 
 ```bash

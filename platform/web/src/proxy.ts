@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { publicEnv, serverSupabaseUrl, SUPABASE_COOKIE_NAME } from './lib/public-env';
 
-const PUBLIC_PREFIXES = ['/login', '/auth', '/forgot-password', '/api/gateway', '/api/cron', '/api/health', '/install'];
+const PUBLIC_PREFIXES = ['/login', '/auth', '/forgot-password', '/api/gateway', '/api/cron', '/api/health', '/install', '/email-templates'];
 
 /**
  * Refreshes the Supabase session cookie on every navigation and redirects
@@ -16,9 +17,10 @@ export async function proxy(request: NextRequest) {
   }
   let response = NextResponse.next({ request });
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)!,
+    serverSupabaseUrl(),
+    publicEnv.supabaseKey,
     {
+      cookieOptions: { name: SUPABASE_COOKIE_NAME },
       cookies: {
         getAll: () => request.cookies.getAll(),
         setAll: (list, headers) => {
@@ -32,9 +34,10 @@ export async function proxy(request: NextRequest) {
   );
   const { data } = await supabase.auth.getClaims();
   if (!data?.claims?.sub) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/login';
-    url.search = pathname === '/' ? '' : `?next=${encodeURIComponent(pathname + request.nextUrl.search)}`;
+    // Redirect on the public origin (APP_URL): behind Docker/reverse proxies the request URL
+    // carries the bind address (e.g. 0.0.0.0), which browsers cannot use and which drops cookies.
+    const url = new URL('/login', process.env.APP_URL || request.nextUrl.origin);
+    if (pathname !== '/') url.searchParams.set('next', pathname + request.nextUrl.search);
     return NextResponse.redirect(url);
   }
   return response;

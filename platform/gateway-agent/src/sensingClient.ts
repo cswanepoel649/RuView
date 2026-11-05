@@ -57,6 +57,17 @@ export class SensingClient {
     void poll();
   }
 
+  /** Waits (bounded) until the sensing-server answers, so start-up races are not reported as outages. */
+  async waitUntilReachable(timeoutMs: number, stepMs = 1000): Promise<boolean> {
+    const end = Date.now() + timeoutMs;
+    for (;;) {
+      if (this.health.reachable) return true;
+      if (Date.now() >= end || this.stopped) return false;
+      await new Promise((r) => setTimeout(r, stepMs));
+      await this.pollOnce();
+    }
+  }
+
   stop() {
     this.stopped = true;
     if (this.pollTimer) clearTimeout(this.pollTimer);

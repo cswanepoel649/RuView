@@ -17,6 +17,9 @@ Legend: ✅ done & automatically tested · 🟢 done, verified by build/typechec
 - ✅ Auth hardening: invite-only, 12-char passwords, token-hash email flows (`supabase/config.toml`)
 - 🟡 Storage policies and Realtime verified against a shim, not a live Supabase instance (Docker images unavailable in CI sandbox)
 
+- ✅ Docker Compose stack (`docker/`): official self-hosted Supabase + idempotent migration runner + web + scheduler + mail + optional gateway — run end-to-end on real images: clean first start, admin bootstrap, invite email → token-hash link → client portal, tenant isolation (404), viewer restrictions, gateway enrollment via wizard, ESP32-format UDP → agent → API → room state, browser Realtime update
+- ✅ Migration runner tested on a fresh database (applies all, second run no-op) — `npm run test:docker-migrate`
+
 ## 3. Device communication & provisioning
 - ✅ NVS partition generator byte-identical to ESP-IDF `nvs_partition_gen` (3 golden images incl. `provision.py` output, blobs, page overflow)
 - ✅ ESP32 packet codecs per firmware layout (CSI header, vitals, fused vitals vs WASM disambiguation, features)

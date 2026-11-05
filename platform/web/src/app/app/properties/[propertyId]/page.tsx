@@ -36,7 +36,7 @@ export default async function ClientPropertyLive({ params }: { params: Promise<{
             <EventList events={flattenEvents(open)} tz={p.timezone} hrefFor={(e) => `/app/alerts?event=${e.id}`} />
           </Card>
         )}
-        <LiveFloorPlan propertyId={p.id} floors={floors} rooms={rooms.filter((r) => r.monitoring_enabled)} initialStates={states} roomHref={(id) => `/app/properties/${p.id}/rooms/${id}`} />
+        <LiveFloorPlan propertyId={p.id} floors={floors} rooms={rooms.filter((r) => r.monitoring_enabled)} initialStates={states} roomHrefBase={`/app/properties/${p.id}/rooms`} />
       </div>
       <div className="space-y-6">
         <Card>

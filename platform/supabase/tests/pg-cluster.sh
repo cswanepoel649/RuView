@@ -17,7 +17,9 @@ pg_cluster_start() {
   for _ in $(seq 1 50); do "$PGBIN/pg_isready" -h 127.0.0.1 -p "$PORT" >/dev/null 2>&1 && break; sleep 0.2; done
   PSQL=("$PGBIN/psql" -h 127.0.0.1 -p "$PORT" -U postgres -d postgres -v ON_ERROR_STOP=1 -q -X -o /dev/null)
   "${PSQL[@]}" -f "$HERE/supabase_shim.sql" 2>/dev/null
-  for f in "$ROOT"/migrations/*.sql; do "${PSQL[@]}" -f "$f" 2>&1 | grep -v 'NOTICE\|^$' || true; done
+  if [ "${PG_CLUSTER_SKIP_MIGRATIONS:-0}" != 1 ]; then
+    for f in "$ROOT"/migrations/*.sql; do "${PSQL[@]}" -f "$f" 2>&1 | grep -v 'NOTICE\|^$' || true; done
+  fi
   export PG_TEST_URL="postgres://postgres@127.0.0.1:$PORT/postgres" WORK
 }
 
