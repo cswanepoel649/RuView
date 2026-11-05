@@ -16,3 +16,5 @@ docker/.env
 docker/supabase/volumes/db/data/
 docker/supabase/volumes/storage/
 docker/supabase/volumes/snippets/
+# The repository root ignores Python-style `lib/` directories; the web app's lib is source.
+!web/src/lib/
